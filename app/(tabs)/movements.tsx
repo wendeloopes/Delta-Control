@@ -14,6 +14,11 @@ export default function MovementsScreen() {
   const [kind, setKind] = useState<'entrada' | 'saida' | 'investimento'>('saida');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('');
+  const [note, setNote] = useState('');
+  const [dateText, setDateText] = useState('');
+  const [fixed, setFixed] = useState(false);
+  const [paid, setPaid] = useState(false);
   const [editing, setEditing] = useState<Movement | null>(null);
   const [offset, setOffset] = useState(0);
   const refresh = useCallback(() => { loadAppData().then(setData).catch(() => Alert.alert('Erro', 'Não foi possível carregar os registros.')); }, []);
@@ -33,14 +38,21 @@ export default function MovementsScreen() {
     setKind(item?.type ?? 'saida');
     setAmount(item ? String(item.amount).replace('.', ',') : '');
     setDescription(item?.description ?? '');
+    setCategory(item?.category ?? ''); setNote(item?.note ?? '');
+    setDateText(item ? new Date(item.createdAt).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR'));
+    setFixed(item?.fixed ?? false); setPaid(item ? item.paid !== false : false);
     setVisible(true);
   }
   async function add() {
     const value = Number(amount.replace(/\\./g, '').replace(',', '.'));
     if (!description.trim() || !Number.isFinite(value) || value <= 0) { Alert.alert('Confira os dados', 'Informe descrição e valor maior que zero.'); return; }
+    const parts = dateText.trim().split('/');
+    if (parts.length !== 3 || parts[0].length !== 2 || parts[1].length !== 2 || parts[2].length !== 4) { Alert.alert('Data inválida', 'Use o formato DD/MM/AAAA.'); return; }
+    const parsedDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]), 12);
+    if (parsedDate.getDate() !== Number(parts[0]) || parsedDate.getMonth() !== Number(parts[1]) - 1) { Alert.alert('Data inválida', 'Confira a data informada.'); return; }
     try {
       const current = data ?? await loadAppData();
-      const item: Movement = { ...(editing ?? {} as Movement), id: editing?.id ?? Date.now().toString(), type: kind, amount: value, description: description.trim(), createdAt: editing?.createdAt ?? new Date().toISOString(), paid: kind !== 'saida' ? true : (editing?.paid ?? false), demo: editing?.demo ?? false };
+      const item: Movement = { ...(editing ?? {} as Movement), id: editing?.id ?? Date.now().toString(), type: kind, amount: value, description: description.trim(), createdAt: parsedDate.toISOString(), paid: kind !== 'saida' ? true : paid, fixed, category: category.trim() || undefined, note: note.trim() || undefined, installment: editing?.installment, demo: editing?.demo ?? false };
       const movements = editing ? current.movements.map(m => m.id === editing.id ? item : m) : [item, ...current.movements];
       const next = { ...current, movements };
       await saveAppData(next); setData(next); setVisible(false); setAmount(''); setDescription(''); setEditing(null);
@@ -81,7 +93,7 @@ export default function MovementsScreen() {
     <Pressable onPress={() => openEditor()} style={s.fab}><Ionicons name="add" color="#06130B" size={30}/></Pressable>
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}><View style={s.backdrop}><View style={s.modal}><View style={s.handle}/><Text style={s.modalTitle}>{editing ? 'Editar registro' : 'Novo registro'}</Text>
       <View style={s.kindRow}>{([{ v: 'saida', t: 'Gasto' }, { v: 'entrada', t: 'Ganho' }, { v: 'investimento', t: 'Investir' }] as const).map(k => <Pressable key={k.v} onPress={() => setKind(k.v)} style={[s.kind, kind === k.v && s.kindActive]}><Text style={[s.kindText, kind === k.v && { color: C.green }]}>{k.t}</Text></Pressable>)}</View>
-      <TextInput value={description} onChangeText={setDescription} placeholder="Descrição" placeholderTextColor={C.tertiary} style={s.input}/><TextInput value={amount} onChangeText={setAmount} placeholder="Valor (ex.: 120,50)" placeholderTextColor={C.tertiary} keyboardType="decimal-pad" style={s.input}/>
+      <TextInput value={description} onChangeText={setDescription} placeholder="Descrição" placeholderTextColor={C.tertiary} style={s.input}/><TextInput value={amount} onChangeText={setAmount} placeholder="Valor (ex.: 120,50)" placeholderTextColor={C.tertiary} keyboardType="decimal-pad" style={s.input}/><TextInput value={category} onChangeText={setCategory} placeholder="Categoria (opcional)" placeholderTextColor={C.tertiary} style={s.input}/><TextInput value={dateText} onChangeText={setDateText} placeholder="Data DD/MM/AAAA" placeholderTextColor={C.tertiary} keyboardType="numbers-and-punctuation" style={s.input}/><TextInput value={note} onChangeText={setNote} placeholder="Observação (opcional)" placeholderTextColor={C.tertiary} style={s.input}/><View style={s.kindRow}><Pressable onPress={() => setFixed(v => !v)} style={[s.kind, fixed && s.kindActive]}><Text style={[s.kindText, fixed && { color: C.green }]}>{fixed ? "✓ Fixo" : "Marcar fixo"}</Text></Pressable>{kind === "saida" ? <Pressable onPress={() => setPaid(v => !v)} style={[s.kind, paid && s.kindActive]}><Text style={[s.kindText, paid && { color: C.green }]}>{paid ? "✓ Pago" : "Pendente"}</Text></Pressable> : null}</View>
       <Pressable onPress={add} style={s.save}><Text style={s.saveText}>{editing ? 'Salvar alterações' : 'Salvar registro'}</Text></Pressable><Pressable onPress={() => setVisible(false)} style={{ padding: 13, alignItems: 'center' }}><Text style={{ color: C.muted }}>Cancelar</Text></Pressable>
     </View></View></Modal>
   </Page>;
