@@ -14,8 +14,7 @@ type Props = {
 
 export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPressOut, onPress }: Props) {
   const pulse = useRef(new Animated.Value(0)).current;
-  const rotate = useRef(new Animated.Value(0)).current;
-  const waveShift = useRef(new Animated.Value(0)).current;
+  const voice = useRef(new Animated.Value(0)).current;
   const flash = useRef(new Animated.Value(0)).current;
   const [reduceMotion, setReduceMotion] = useState(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -29,6 +28,26 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
     const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
     return () => subscription.remove();
   }, []);
+
+  // The ribbons react to the microphone's measured input level, not to a free-running rotation.
+  useEffect(() => {
+    const target = listening ? Math.max(0, Math.min(1, level)) : 0;
+    Animated.spring(voice, { toValue: target, speed: 22, bounciness: 5, useNativeDriver: true }).start();
+  }, [level, listening, voice]);
+
+  useEffect(() => {
+    pulse.stopAnimation();
+    if (reduceMotion) {
+      pulse.setValue(0.25);
+      return;
+    }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: listening ? 850 : processing ? 1500 : 3200, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: listening ? 850 : processing ? 1500 : 3200, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [listening, processing, pulse, reduceMotion]);
 
   useEffect(() => {
     if (state !== 'error' && state !== 'success') {
@@ -45,37 +64,13 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
     ]).start();
   }, [flash, reduceMotion, state]);
 
-  useEffect(() => {
-    pulse.stopAnimation();
-    rotate.stopAnimation();
-    waveShift.stopAnimation();
-    if (reduceMotion) {
-      pulse.setValue(0.25);
-      rotate.setValue(0);
-      waveShift.setValue(0);
-      return;
-    }
-    const pulseLoop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: listening ? 900 : processing ? 1700 : 3500, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0, duration: listening ? 900 : processing ? 1700 : 3500, useNativeDriver: true }),
-    ]));
-    const rotateLoop = Animated.loop(Animated.timing(rotate, {
-      toValue: 1, duration: listening ? 2600 : processing ? 4200 : 7000, useNativeDriver: true,
-    }));
-    const waveLoop = Animated.loop(Animated.sequence([
-      Animated.timing(waveShift, { toValue: 1, duration: listening ? 650 : processing ? 1100 : 3200, useNativeDriver: true }),
-      Animated.timing(waveShift, { toValue: 0, duration: listening ? 650 : processing ? 1100 : 3200, useNativeDriver: true }),
-    ]));
-    pulseLoop.start();
-    rotateLoop.start();
-    waveLoop.start();
-    return () => { pulseLoop.stop(); rotateLoop.stop(); waveLoop.stop(); };
-  }, [listening, processing, pulse, reduceMotion, rotate, waveShift]);
-
-  const rotation = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const drift = waveShift.interpolate({ inputRange: [0, 1], outputRange: [-7, 7] });
-  const haloOpacity = error || state === 'success' ? flash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.62] }) : pulse.interpolate({ inputRange: [0, 1], outputRange: [0.22, listening ? 0.52 : 0.38] });
-  const scale = listening ? 1 + Math.min(0.06, level * 0.06) : pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.018] });
+  const waveY = voice.interpolate({ inputRange: [0, 1], outputRange: [0, -13] });
+  const waveScale = voice.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1.12] });
+  const waveOpacity = voice.interpolate({ inputRange: [0, 0.08, 1], outputRange: [0.62, 0.72, 1] });
+  const haloOpacity = error || state === 'success' ? flash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.62] }) : pulse.interpolate({ inputRange: [0, 1], outputRange: [0.18, listening ? 0.55 : 0.32] });
+  const scale = listening
+    ? voice.interpolate({ inputRange: [0, 1], outputRange: [1, 1.045] })
+    : pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.012] });
 
   function pressIn() {
     held.current = false;
@@ -124,7 +119,7 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
             <Circle cx="184" cy="81" r="1.7" fill="#A8B9FF" opacity="0.85" />
             <Circle cx="17" cy="74" r="1.4" fill="#43EFFF" opacity="0.75" />
           </Svg>
-          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: drift }, { rotate: rotation }] }]}>
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { opacity: waveOpacity, transform: [{ translateY: waveY }, { scaleY: waveScale }] }]}>
             <Svg width={size} height={size} viewBox="0 0 200 200">
               <Defs>
                 <LinearGradient id="orbWaveA" x1="0%" y1="0%" x2="100%" y2="0%">
