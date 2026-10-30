@@ -18,27 +18,41 @@ const units: Record<string, number> = {
 };
 const numberWords = new Set([...Object.keys(units), 'e', 'mil', 'milhao', 'milhoes', 'meio', 'reais', 'real', 'conto', 'contos']);
 
-function wordsToNumber(tokens: string[]): number | null {
-  const useful = tokens.filter(t => t !== 'reais' && t !== 'real' && t !== 'conto' && t !== 'contos');
-  if (!useful.length) return null;
-  let total = 0, group = 0, decimal = false, cents = 0;
-  for (let i = 0; i < useful.length; i++) {
-    const t = useful[i];
-    if (t === 'e') continue;
-    if (t === 'meio') { if (total === 0 && group === 0) return 0.5; cents = 50; decimal = true; continue; }
-    if (t === 'mil' || t === 'milhao' || t === 'milhoes') { total += Math.max(group, 1) * (t === 'mil' ? 1000 : 1000000); group = 0; continue; }
-    const n = units[t];
-    if (n === undefined) return null;
-    if (decimal) cents = cents * 10 + n;
-    else group += n;
+function integerWords(tokens: string[]): number | null {
+  let total = 0;
+  let group = 0;
+  for (const token of tokens) {
+    if (token === 'e') continue;
+    if (token === 'mil' || token === 'milhao' || token === 'milhoes') {
+      total += Math.max(group, 1) * (token === 'mil' ? 1000 : 1000000);
+      group = 0;
+      continue;
+    }
+    const value = units[token];
+    if (value === undefined) return null;
+    group += value;
   }
-  const value = total + group;
-  return decimal ? value + cents / 100 : value;
+  return total + group;
 }
 
-const numberPattern = /(?:r\$\s*)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[,.]\d{1,2})?)/i;
+function wordsToNumber(tokens: string[]): number | null {
+  if (tokens.length === 1 && tokens[0] === 'meio') return 0.5;
+  const currencyIndex = tokens.findIndex(token => ['reais', 'real', 'conto', 'contos'].includes(token));
+  const wholeTokens = currencyIndex >= 0 ? tokens.slice(0, currencyIndex) : tokens;
+  const centsTokens = currencyIndex >= 0 ? tokens.slice(currencyIndex + 1).filter(token => token !== 'e') : [];
+  const whole = integerWords(wholeTokens);
+  if (whole === null) return null;
+  if (centsTokens.length) {
+    const cents = integerWords(centsTokens);
+    if (cents === null || cents > 99) return null;
+    return whole + cents / 100;
+  }
+  return whole;
+}
+
+const numberPattern = /(?:r\$\s*)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[,.]\d{1,2})?)(?:\s+(mil)\b)?(?:\s+(?:reais?\s+)?e\s+(\d{1,2})\b)?/i;
 const typePatterns = {
-  investimento: /\b(investi|apliquei|aport(ei|o)|guardei|investimento)\b/,
+  investimento: /\b(investi|apliquei|aportei|guardei|investimento)\b/,
   ganho: /\b(recebi|ganhei|entrou|salario|renda|vendi|caiu|entrada)\b/,
   gasto: /\b(gastei|paguei|comprei|pago|despesa|saiu|debitei|mercado|uber|compra|saida)\b/,
 };
@@ -53,7 +67,7 @@ export function parseCommand(input: string, now: Date = new Date()): ParsedComma
   const installments = installmentMatch ? Number(installmentMatch[1] || installmentMatch[2]) : undefined;
   if (installmentMatch) text = text.replace(installmentMatch[0], ' ');
 
-  let date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
   const dateMatch = text.match(/\b(hoje|ontem|anteontem|dia\s+\d{1,2})\b/);
   if (dateMatch) {
     if (dateMatch[1] === 'ontem') date.setDate(date.getDate() - 1);
@@ -61,7 +75,7 @@ export function parseCommand(input: string, now: Date = new Date()): ParsedComma
     else if (dateMatch[1].startsWith('dia ')) {
       const day = Number(dateMatch[1].replace('dia ', ''));
       const candidate = new Date(now.getFullYear(), now.getMonth(), day, 12);
-      if (day > 0 && day <= new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() && candidate <= new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59)) date = candidate;
+      if (day > 0 && day <= new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() && candidate <= new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59)) date.setTime(candidate.getTime());
     }
     text = text.replace(dateMatch[0], ' ');
   }
@@ -71,10 +85,13 @@ export function parseCommand(input: string, now: Date = new Date()): ParsedComma
   if (numeric) {
     const raw = numeric[1];
     amount = Number(raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw.includes('.') && /^\d{1,3}(?:\.\d{3})+$/.test(raw) ? raw.replace(/\./g, '') : raw);
+    if (numeric[2]) amount *= 1000;
+    if (numeric[3]) amount += Number(numeric[3]) / 100;
     text = text.replace(numeric[0], ' ');
   } else {
     const tokens = text.split(' ');
-    let start = -1, end = -1;
+    let start = -1;
+    let end = -1;
     for (let i = 0; i < tokens.length; i++) {
       if (!numberWords.has(tokens[i])) continue;
       let j = i;
@@ -85,9 +102,13 @@ export function parseCommand(input: string, now: Date = new Date()): ParsedComma
     if (start >= 0) tokens.splice(start, end - start);
     text = tokens.join(' ');
   }
-  if (amount === null || !Number.isFinite(amount) || amount <= 0 || (installments !== undefined && (installments < 2 || installments > 48))) return null;
 
-  text = text.replace(/\b(r\$|reais?|contos?)\b/g, ' ').replace(/\b(gastei|paguei|comprei|pago|despesa|saiu|debitei|recebi|ganhei|entrou|salario|renda|vendi|caiu|entrada|investi|apliquei|aportei|guardei|investimento|saida|compra)\b/g, ' ').replace(/\b(no|na|em|de|do|da|dos|das|com|para|por|e)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  if (amount === null || !Number.isFinite(amount) || amount <= 0 || (installments !== undefined && (installments < 2 || installments > 48))) return null;
+  text = text
+    .replace(/\b(r\$|reais?|contos?)\b/g, ' ')
+    .replace(/\b(gastei|paguei|comprei|pago|despesa|saiu|debitei|recebi|ganhei|entrou|salario|renda|vendi|caiu|entrada|investi|apliquei|aportei|guardei|investimento|saida|compra)\b/g, ' ')
+    .replace(/\b(no|na|em|de|do|da|dos|das|com|para|por|e|um|uma|uns|umas)\b/g, ' ')
+    .replace(/\s+/g, ' ').trim();
   const description = text ? text.charAt(0).toUpperCase() + text.slice(1) : (type === 'investimento' ? 'Investimento' : type === 'ganho' ? 'Entrada' : 'Gasto');
   return { type, amount: Math.round(amount * 100) / 100, description, category: categoryForDescription(description), date, ...(installments ? { installments } : {}) };
 }
