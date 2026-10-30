@@ -18,15 +18,20 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
   const startPendingRef = useRef(false);
   const ignoreEndRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onCommandRef = useRef(onCommand);
   onCommandRef.current = onCommand;
 
   const clearTimeoutRef = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = null;
+    if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
+    startupTimerRef.current = null;
   };
 
   useSpeechRecognitionEvent('start', () => {
+    if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
+    startupTimerRef.current = null;
     setState('listening');
     setError('');
   });
@@ -45,6 +50,7 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
   useSpeechRecognitionEvent('error', event => {
     clearTimeoutRef();
     if (event.error === 'aborted') return;
+    setLevel(0);
     setState('error');
     setError(event.error === 'no-speech' || event.error === 'speech-timeout'
       ? 'Não ouvi nada, tente de novo'
@@ -98,6 +104,14 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
         volumeChangeEventOptions: { enabled: true, intervalMillis: 150 },
         recordingOptions: { persist: false },
       });
+      // Do not leave the interface pretending to listen if Android never starts its speech service.
+      startupTimerRef.current = setTimeout(() => {
+        startupTimerRef.current = null;
+        try { ExpoSpeechRecognitionModule.abort(); } catch { /* service did not start */ }
+        setLevel(0);
+        setState('error');
+        setError('O serviço de reconhecimento não iniciou. Verifique se há um serviço de voz instalado no Android.');
+      }, 4500);
       timeoutRef.current = setTimeout(() => ExpoSpeechRecognitionModule.stop(), 15000);
       return true;
     } catch {
@@ -112,7 +126,8 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
   const stop = useCallback(() => {
     startCancelledRef.current = true;
     clearTimeoutRef();
-    try { ExpoSpeechRecognitionModule.stop(); } catch { /* recognition may already be closed */ }
+    setLevel(0);
+    try { ExpoSpeechRecognitionModule.stop(); catch { /* recognition may already be closed */ }
   }, []);
 
   const cancel = useCallback(() => {
