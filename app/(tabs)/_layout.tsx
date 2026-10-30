@@ -15,7 +15,7 @@ const items = [
 function DeltaDock({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const dockWidth = Math.max(208, Math.min(width - 152, 360));
+  const dockWidth = Math.min(width - 152, 360);
 
   return (
     <View pointerEvents="box-none" style={[styles.outer, { bottom: insets.bottom + 12 }]}>
