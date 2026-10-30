@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Delta Control",
+    "slug": "delta-control",
+    "scheme": "deltacontrol",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "plugins": ["expo-router"],
+    "experiments": {"typedRoutes": true},
+    "android": {"package": "com.deltacontrol.app"},
+    "ios": {"bundleIdentifier": "com.deltacontrol.app"}
+  }
+}
