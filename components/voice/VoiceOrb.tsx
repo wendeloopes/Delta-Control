@@ -188,7 +188,8 @@ export default function VoiceOrb({ state, level = 0, bass = 0, treble = 0, size 
           </Animated.View>
           <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { opacity: listening ? lowBand.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.75] }) : 0.12, transform: [{ scaleY: bassScale }] }]}>
             <Svg width={size} height={size} viewBox="0 0 200 200">
-              <Path d="M8 100 C32 75 53 78 78 98 C103 119 128 122 153 99 C171 83 185 88 192 100 C174 121 148 130 120 112 C91 94 69 90 45 111 C27 125 13 114 8 100Z" fill="url(#orbWaveB)" />
+              <Defs><LinearGradient id="orbBassWave" x1="0%" y1="0%" x2="100%" y2="0%"><Stop offset="0%" stopColor="#F000FF" stopOpacity="0.08"/><Stop offset="35%" stopColor="#F000FF" stopOpacity="0.9"/><Stop offset="55%" stopColor="#FFFFFF" stopOpacity="0.95"/><Stop offset="100%" stopColor="#00DFFF" stopOpacity="0.2"/></LinearGradient></Defs>
+              <Path d="M8 100 C32 75 53 78 78 98 C103 119 128 122 153 99 C171 83 185 88 192 100 C174 121 148 130 120 112 C91 94 69 90 45 111 C27 125 13 114 8 100Z" fill="url(#orbBassWave)" />
             </Svg>
           </Animated.View>
         </View>
