@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C, Card, Page } from '../../components/ui';
 import { AppData, Movement, loadAppData } from '../../lib/storage';
@@ -10,6 +10,7 @@ const money = (n: number) => (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR'
 const percentWidth = (part: number, total: number): `${number}%` => `${total > 0 ? Math.max(0, Math.min(100, (part / total) * 100)) : 0}%`;
 const palette = ['#9EA0A6', '#FF9A3D', C.blue, C.mint, C.green, C.purple];
 export default function StatsScreen() {
+  const router = useRouter();
   const [data, setData] = useState<AppData | null>(null);
   const [offset, setOffset] = useState(0);
   const refresh = useCallback(() => { loadAppData().then(setData).catch(() => Alert.alert('Erro', 'Não foi possível carregar a análise.')); }, []);
@@ -88,7 +89,7 @@ export default function StatsScreen() {
       <Card><View style={s.cardHeading}><Text style={s.cardTitle}>Gastos por dia</Text><Text style={s.cardMeta}>média diária: {money(average)}</Text></View>
         <View style={s.chart}>{daily.map((value, i) => <View key={i} style={s.barGroup}><View style={s.barTrack}><View style={[s.bar, { height: value > 0 ? (Math.max(4, value / maxDay * 100) + '%') as `${number}%` : 0 }]}/></View>{(i === 0 || i === 15 || i === daysInMonth - 1) ? <Text style={s.barLabel}>{i + 1}</Text> : null}</View>)}</View>
       </Card>
-      <Card><Text style={s.cardTitle}>Maiores gastos</Text>{expenses.length === 0 ? <Text style={s.empty}>Nenhum gasto registrado.</Text> : expenses.slice(0, 5).map((m, i) => <View key={m.id} style={[s.topExpense, i > 0 && s.topDivider]}><View style={s.categoryIcon}><Ionicons name="ellipse-outline" color={C.yellow} size={18}/></View><View style={{ flex: 1 }}><Text style={s.rowTitle}>{m.description}</Text><Text style={s.rowSub}>{/almo[cç]|comida|restaurante|lanche|mercado/i.test(m.description) ? 'Alimentação' : 'Outros'} · {new Date(m.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</Text></View><Text style={s.topValue}>{money(m.amount)}</Text></View>)}</Card>
+      <Card><Text style={s.cardTitle}>Maiores gastos</Text>{expenses.length === 0 ? <Text style={s.empty}>Nenhum gasto registrado.</Text> : expenses.slice(0, 5).map((m, i) => <Pressable key={m.id} onPress={() => router.push({ pathname: '/(tabs)/movements', params: { editId: m.id } })} style={[s.topExpense, i > 0 && s.topDivider]}><View style={s.categoryIcon}><Ionicons name="ellipse-outline" color={C.yellow} size={18}/></View><View style={{ flex: 1 }}><Text style={s.rowTitle}>{m.description}</Text><Text style={s.rowSub}>{/almo[cç]|comida|restaurante|lanche|mercado/i.test(m.description) ? 'Alimentação' : 'Outros'} · {new Date(m.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</Text></View><Text style={s.topValue}>{money(m.amount)}</Text><Ionicons name="chevron-forward" color={C.tertiary} size={15}/></Pressable>)}</Card>
       <Card style={s.deltaCard}><View style={s.deltaHeader}><Ionicons name="sparkles" color={C.green} size={19}/><Text style={s.deltaTitle}>Análise Delta</Text></View>
         <Text style={s.deltaText}>A análise completa aparece quando o mês fechar. Quer uma prévia com o que já tem?</Text>
         <Pressable onPress={() => Alert.alert('Prévia local', totals.expense === 0 ? 'Ainda não há gastos registrados neste mês.' : totals.balance >= 0 ? 'Seu saldo está positivo com base nos lançamentos locais.' : 'Os gastos superam as entradas registradas neste mês. Revise seus lançamentos.')} style={s.generate}><Ionicons name="refresh" color={C.text} size={16}/><Text style={s.generateText}>Gerar análise agora</Text></Pressable>
