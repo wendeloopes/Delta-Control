@@ -1,26 +1,105 @@
-import React,{useCallback,useMemo,useState}from'react';
-import{Alert,Modal,Pressable,ScrollView,StyleSheet,Text,TextInput,View}from'react-native';
-import{useFocusEffect}from'expo-router';import{Ionicons}from'@expo/vector-icons';
-import{C,Card,Page}from'../../components/ui';import{AppData,loadAppData,saveAppData}from'../../lib/storage';import{parseQuickCommand}from'../../lib/commands';
-const money=(n:number)=>n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const greeting=()=>{const h=new Date().getHours();return h<12?'Bom dia':h<18?'Boa tarde':'Boa noite';};
-export default function HomeScreen(){
- const[data,setData]=useState<AppData|null>(null);const[visible,setVisible]=useState(false);const[command,setCommand]=useState('');
- const refresh=useCallback(()=>{loadAppData().then(setData).catch(()=>Alert.alert('Erro','Não foi possível carregar os dados.'));},[]);
- useFocusEffect(useCallback(()=>{refresh();},[refresh]));
- const totals=useMemo(()=>{const ms=data?.movements??[];const income=ms.filter(m=>m.type==='entrada').reduce((a,m)=>a+m.amount,0);const expense=ms.filter(m=>m.type==='saida').reduce((a,m)=>a+m.amount,0);const invested=ms.filter(m=>m.type==='investimento').reduce((a,m)=>a+m.amount,0);return{income,expense,invested,balance:(data?.openingBalance??0)+income-expense-invested};},[data]);
- async function addCommand(){const parsed=parseQuickCommand(command);if(!parsed){Alert.alert('Comando não reconhecido','Ex.: entrada 150 venda, saída 29,90 almoço ou investi 100 reserva.');return;}try{const current=data??await loadAppData();const next={...current,movements:[{...parsed,id:Date.now().toString(),createdAt:new Date().toISOString()},...current.movements]};await saveAppData(next);setData(next);setCommand('');setVisible(false);Alert.alert('Salvo','Registro adicionado ao dispositivo.');}catch{Alert.alert('Erro','Não foi possível salvar.');}}
- if(!data)return <Page><Text style={{color:C.muted}}>Carregando Delta Control…</Text></Page>;
- return <Page><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom:24}}>
- <View style={s.header}><View><Text style={s.greeting}>{greeting()}, Wendel</Text><Text style={s.month}>{new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}</Text></View><View style={s.mark}><Ionicons name="triangle" color={C.green} size={21}/></View></View>
- <Card style={s.balanceCard}><Text style={s.label}>SALDO ATÉ AGORA</Text><Text style={[s.balance,{color:totals.balance<0?C.red:C.green}]}>{money(totals.balance)}</Text><View style={s.metrics}><View style={s.metric}><Text style={s.metricLabel}>ENTROU</Text><Text style={[s.metricValue,{color:C.green}]}>{money(totals.income)}</Text></View><View style={s.metric}><Text style={s.metricLabel}>GASTOU</Text><Text style={[s.metricValue,{color:C.red}]}>{money(totals.expense)}</Text></View><View style={s.metric}><Text style={s.metricLabel}>INVESTIU</Text><Text style={[s.metricValue,{color:C.blue}]}>{money(totals.invested)}</Text></View></View></Card>
- <View style={s.sectionHead}><Text style={s.sectionTitle}>Assistente Delta</Text><Text style={s.ready}>● PRONTO</Text></View>
- <Pressable accessibilityRole="button" accessibilityLabel="Abrir comando rápido" onPress={()=>setVisible(true)} onLongPress={()=>setVisible(true)} delayLongPress={250} style={({pressed})=>[s.triangleButton,pressed&&{transform:[{scale:.97}]}]}><View style={s.triangleOuter}/><View style={s.triangleInner}/><View style={s.triangleCore}><Ionicons name="mic" color={C.green} size={31}/></View></Pressable>
- <Text style={s.voiceTitle}>Toque ou segure para falar</Text><Text style={s.voiceSub}>Comando rápido por texto nesta versão</Text>
- <View style={s.sectionHead}><Text style={s.sectionTitle}>Últimos registros</Text><Text style={s.more}>MAIS RECENTES</Text></View>
- <Card style={{paddingVertical:4}}>{data.movements.slice(0,4).map(m=><View key={m.id} style={s.row}><View style={[s.icon,{backgroundColor:m.type==='entrada'?'#24351E':m.type==='investimento'?'#1E2D3E':'#382329'}]}><Ionicons name={m.type==='entrada'?'arrow-down':m.type==='investimento'?'trending-up':'arrow-up'} size={16} color={m.type==='entrada'?C.green:m.type==='investimento'?C.blue:C.red}/></View><View style={{flex:1}}><Text style={s.name}>{m.description}</Text><Text style={s.date}>{new Date(m.createdAt).toLocaleDateString('pt-BR')}</Text></View><Text style={{color:m.type==='entrada'?C.green:m.type==='investimento'?C.blue:C.text,fontWeight:'900',fontSize:12}}>{m.type==='entrada'?'+':m.type==='investimento'?'↗':'−'} {money(m.amount)}</Text></View>)}{data.movements.length===0&&<Text style={s.date}>Nenhum registro por enquanto.</Text>}</Card>
- </ScrollView>
- <Modal visible={visible} transparent animationType="slide" onRequestClose={()=>setVisible(false)}><View style={s.backdrop}><View style={s.modal}><View style={s.handle}/><Text style={s.modalTitle}>Comando Delta</Text><Text style={s.voiceSub}>Digite uma entrada, gasto ou investimento.</Text><TextInput value={command} onChangeText={setCommand} placeholder="Ex.: investi 100 reserva" placeholderTextColor={C.muted} autoCapitalize="sentences" style={s.input}/><View style={s.chips}><Text onPress={()=>setCommand('entrada 150 venda')} style={s.chip}>+ entrada 150</Text><Text onPress={()=>setCommand('saída 29,90 almoço')} style={s.chip}>− saída 29,90</Text><Text onPress={()=>setCommand('investi 100 reserva')} style={s.chip}>↗ investi 100</Text></View><Pressable style={s.save} onPress={addCommand}><Text style={s.saveText}>Salvar registro</Text></Pressable><Pressable onPress={()=>setVisible(false)} style={{padding:14,alignItems:'center'}}><Text style={{color:C.muted}}>Cancelar</Text></Pressable></View></View></Modal>
- </Page>;
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { C, Card, Page } from '../../components/ui';
+import { AppData, loadAppData, saveAppData } from '../../lib/storage';
+import { parseQuickCommand } from '../../lib/commands';
+
+const money = (n: number) => (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const greeting = () => { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; };
+
+export default function HomeScreen() {
+  const [data, setData] = useState<AppData | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [command, setCommand] = useState('');
+  const { width } = useWindowDimensions();
+  const refresh = useCallback(() => { loadAppData().then(setData).catch(() => Alert.alert('Erro', 'Não foi possível carregar os dados.')); }, []);
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  const monthMovements = useMemo(() => (data?.movements ?? []).filter(m => {
+    const d = new Date(m.createdAt); const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }), [data]);
+  const totals = useMemo(() => {
+    const income = monthMovements.filter(m => m.type === 'entrada').reduce((a, m) => a + m.amount, 0);
+    const expense = monthMovements.filter(m => m.type === 'saida').reduce((a, m) => a + m.amount, 0);
+    const invested = monthMovements.filter(m => m.type === 'investimento').reduce((a, m) => a + m.amount, 0);
+    return { income, expense, invested, balance: income - expense };
+  }, [monthMovements]);
+  const progress = totals.income > 0 ? Math.min(totals.expense / totals.income, 1) : totals.expense > 0 ? 1 : 0;
+  async function addCommand() {
+    const parsed = parseQuickCommand(command);
+    if (!parsed) { Alert.alert('Comando não reconhecido', 'Ex.: entrada 150 venda, saída 29,90 almoço ou investi 100 reserva.'); return; }
+    try {
+      const current = data ?? await loadAppData();
+      const next = { ...current, movements: [{ ...parsed, id: Date.now().toString(), createdAt: new Date().toISOString() }, ...current.movements] };
+      await saveAppData(next); setData(next); setCommand(''); setVisible(false);
+      Alert.alert('Salvo', 'Registro adicionado ao dispositivo.');
+    } catch { Alert.alert('Erro', 'Não foi possível salvar.'); }
+  }
+  if (!data) return <Page><Text style={{ color: C.muted }}>Carregando Delta Control…</Text></Page>;
+  const balanceColor = totals.balance < 0 ? C.red : C.mint;
+  const balanceText = money(totals.balance).replace('R$', 'R$ ');
+  return <Page>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 150 }}>
+      <View style={s.header}>
+        <View><Text style={s.greeting}>{greeting()}</Text><Text style={s.month}>{new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</Text></View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Abrir comando por texto" onPress={() => setVisible(true)} style={s.keyboard}><Ionicons name="keypad-outline" color={C.text} size={23} /></Pressable>
+      </View>
+      <View style={s.balanceBlock}>
+        <Text style={s.label}>SALDO</Text>
+        <Text adjustsFontSizeToFit numberOfLines={1} style={[s.balance, { color: balanceColor, fontSize: width < 350 ? 43 : 53 }]}>{balanceText}</Text>
+        <View style={s.progress}><View style={[s.progressFill, { width: (progress * 100) + '%' as `${number}%`, backgroundColor: balanceColor }]} /></View>
+        <View style={s.metrics}>
+          <View style={s.metric}><View style={s.metricLabelRow}><View style={[s.dot, { backgroundColor: C.mint }]} /><Text style={s.metricLabel}>Entrou</Text></View><Text style={s.metricValue}>{money(totals.income)}</Text></View>
+          <View style={s.metric}><View style={s.metricLabelRow}><View style={[s.dot, { backgroundColor: C.red }]} /><Text style={s.metricLabel}>Gastou</Text></View><Text style={s.metricValue}>{money(totals.expense)}</Text></View>
+          <View style={s.metric}><View style={s.metricLabelRow}><View style={[s.dot, { backgroundColor: C.blue }]} /><Text style={s.metricLabel}>Investiu</Text></View><Text style={s.metricValue}>{money(totals.invested)}</Text></View>
+        </View>
+        <View style={s.forecast}><Ionicons name="calendar-outline" color={C.muted} size={15}/><Text style={s.forecastLabel}>Saldo previsto no fim do mês:</Text><Text style={[s.forecastValue, { color: balanceColor }]}>{money(totals.balance)}</Text></View>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Abrir comando textual" onPress={() => setVisible(true)} onLongPress={() => setVisible(true)} delayLongPress={250} style={({ pressed }) => [s.logoArea, pressed && { transform: [{ scale: 1.02 }] }]}>
+        <View style={s.glow} /><View style={s.logoOuter}/><View style={s.logoInner}/><View style={s.logoCore}><Ionicons name="mic-outline" color={C.text} size={34}/></View>
+      </Pressable>
+      <Text style={s.voiceTitle}>Toque ou segure para falar</Text>
+      <Text style={s.voiceHint}>Comando por texto disponível nesta versão</Text>
+      <Text style={s.example}>experimente: “gastei 32 no uber”</Text>
+    </ScrollView>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}>
+      <View style={s.backdrop}><View style={s.modal}><View style={s.handle}/><Text style={s.modalTitle}>Comando Delta</Text><Text style={s.modalHint}>Digite uma entrada, gasto ou investimento.</Text>
+        <TextInput value={command} onChangeText={setCommand} placeholder="Ex.: gastei 32 no uber" placeholderTextColor={C.tertiary} autoCapitalize="sentences" style={s.input}/>
+        <View style={s.chips}><Text onPress={() => setCommand('entrada 150 venda')} style={s.chip}>+ entrada 150</Text><Text onPress={() => setCommand('saída 29,90 almoço')} style={s.chip}>− saída 29,90</Text><Text onPress={() => setCommand('investi 100 reserva')} style={s.chip}>↗ investi 100</Text></View>
+        <Pressable style={s.save} onPress={addCommand}><Text style={s.saveText}>Salvar registro</Text></Pressable><Pressable onPress={() => setVisible(false)} style={{ padding: 14, alignItems: 'center' }}><Text style={{ color: C.muted }}>Cancelar</Text></Pressable>
+      </View></View>
+    </Modal>
+  </Page>;
 }
-const s=StyleSheet.create({header:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:17},greeting:{color:C.text,fontSize:22,fontWeight:'900'},month:{color:C.muted,fontSize:12,marginTop:4,textTransform:'capitalize'},mark:{width:43,height:43,borderRadius:15,backgroundColor:C.panel,borderWidth:1,borderColor:C.border,alignItems:'center',justifyContent:'center'},balanceCard:{backgroundColor:'#171B1D',borderColor:'#34452B',padding:19},label:{color:C.muted,fontSize:10,fontWeight:'900',letterSpacing:1.5},balance:{fontSize:34,fontWeight:'900',marginTop:9,letterSpacing:-1},metrics:{flexDirection:'row',justifyContent:'space-between',marginTop:20,paddingTop:15,borderTopWidth:1,borderTopColor:C.border},metric:{flex:1},metricLabel:{color:C.muted,fontSize:9,fontWeight:'900',letterSpacing:1},metricValue:{fontSize:11,fontWeight:'900',marginTop:6},sectionHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:10},sectionTitle:{color:C.text,fontSize:16,fontWeight:'900'},ready:{color:C.green,fontSize:9,fontWeight:'900',letterSpacing:1},triangleButton:{height:218,alignItems:'center',justifyContent:'center',marginTop:2},triangleOuter:{position:'absolute',width:0,height:0,borderLeftWidth:116,borderRightWidth:116,borderBottomWidth:202,borderLeftColor:'transparent',borderRightColor:'transparent',borderBottomColor:C.green,top:5},triangleInner:{position:'absolute',width:0,height:0,borderLeftWidth:99,borderRightWidth:99,borderBottomWidth:172,borderLeftColor:'transparent',borderRightColor:'transparent',borderBottomColor:'#172018',top:20},triangleCore:{marginTop:43,width:70,height:70,borderRadius:35,backgroundColor:'#202E1A',borderWidth:1,borderColor:'#6EAC32',alignItems:'center',justifyContent:'center'},voiceTitle:{color:C.text,textAlign:'center',fontSize:14,fontWeight:'900',marginTop:-3},voiceSub:{color:C.muted,textAlign:'center',fontSize:11,marginTop:5},more:{color:C.green,fontSize:9,fontWeight:'900',letterSpacing:1},row:{flexDirection:'row',alignItems:'center',paddingVertical:12,borderBottomWidth:1,borderBottomColor:C.border,gap:10},icon:{width:37,height:37,borderRadius:12,alignItems:'center',justifyContent:'center'},name:{color:C.text,fontSize:12,fontWeight:'800'},date:{color:C.muted,fontSize:10,marginTop:4},backdrop:{flex:1,backgroundColor:'#000D',justifyContent:'flex-end'},modal:{backgroundColor:C.panel,borderTopLeftRadius:25,borderTopRightRadius:25,padding:21,paddingBottom:30,borderWidth:1,borderColor:C.border},handle:{width:42,height:4,borderRadius:3,backgroundColor:C.border,alignSelf:'center',marginBottom:18},modalTitle:{color:C.text,fontSize:22,fontWeight:'900'},input:{backgroundColor:C.bg,color:C.text,borderWidth:1,borderColor:C.border,borderRadius:14,padding:15,fontSize:15,marginTop:18},chips:{flexDirection:'row',flexWrap:'wrap',gap:8,marginVertical:14},chip:{color:C.green,fontSize:10,fontWeight:'900',backgroundColor:'#24321B',padding:9,borderRadius:9,overflow:'hidden'},save:{backgroundColor:C.green,borderRadius:13,padding:15,alignItems:'center'},saveText:{color:'#11150C',fontWeight:'900'}});
+const s = StyleSheet.create({
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
+  greeting: { color: C.text, fontSize: 20, fontWeight: '700' }, month: { color: C.muted, fontSize: 14, marginTop: 5, textTransform: 'capitalize' },
+  keyboard: { width: 48, height: 48, borderRadius: 16, backgroundColor: C.panel2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  balanceBlock: { alignItems: 'center', paddingTop: 7 },
+  label: { color: C.muted, fontSize: 13, letterSpacing: 3, fontWeight: '500' },
+  balance: { fontWeight: '700', letterSpacing: -2, marginTop: 6, marginBottom: 18, fontVariant: ['tabular-nums'] },
+  progress: { width: '100%', height: 7, borderRadius: 9, backgroundColor: C.track, overflow: 'hidden' },
+  progressFill: { height: 7, borderRadius: 9 },
+  metrics: { width: '100%', flexDirection: 'row', marginTop: 23, marginBottom: 18 },
+  metric: { flex: 1, alignItems: 'center' }, metricLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4 }, metricLabel: { color: C.muted, fontSize: 12 },
+  metricValue: { color: C.text, fontSize: 14, fontWeight: '700', marginTop: 8, fontVariant: ['tabular-nums'] },
+  forecast: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.panel2, borderRadius: 30, paddingHorizontal: 14, paddingVertical: 11, flexWrap: 'wrap', justifyContent: 'center' },
+  forecastLabel: { color: C.muted, fontSize: 11 }, forecastValue: { fontSize: 12, fontWeight: '800' },
+  logoArea: { height: 300, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+  glow: { position: 'absolute', width: 245, height: 245, borderRadius: 125, backgroundColor: '#123D25', opacity: .42 },
+  logoOuter: { position: 'absolute', width: 0, height: 0, borderLeftWidth: 116, borderRightWidth: 116, borderBottomWidth: 204, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#F5F7F6' },
+  logoInner: { position: 'absolute', width: 0, height: 0, borderLeftWidth: 93, borderRightWidth: 93, borderBottomWidth: 164, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: C.bg, top: 72 },
+  logoCore: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#14231A', borderWidth: 1, borderColor: '#3DDC84', alignItems: 'center', justifyContent: 'center', marginTop: 50 },
+  voiceTitle: { color: C.text, textAlign: 'center', fontSize: 17, fontWeight: '600', marginTop: 1 },
+  voiceHint: { color: C.muted, textAlign: 'center', fontSize: 12, marginTop: 9 },
+  example: { color: C.tertiary, textAlign: 'center', fontSize: 11, marginTop: 23 },
+  backdrop: { flex: 1, backgroundColor: '#000D', justifyContent: 'flex-end' }, modal: { backgroundColor: C.panel, borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 21, paddingBottom: 30, borderWidth: 1, borderColor: C.border },
+  handle: { width: 42, height: 4, borderRadius: 3, backgroundColor: C.border, alignSelf: 'center', marginBottom: 18 },
+  modalTitle: { color: C.text, fontSize: 22, fontWeight: '800' }, modalHint: { color: C.muted, fontSize: 12, marginTop: 5 },
+  input: { backgroundColor: C.bg, color: C.text, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 15, fontSize: 15, marginTop: 18 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 14 }, chip: { color: C.green, fontSize: 10, fontWeight: '800', backgroundColor: '#17271C', padding: 9, borderRadius: 9, overflow: 'hidden' },
+  save: { backgroundColor: C.green, borderRadius: 13, padding: 15, alignItems: 'center' }, saveText: { color: '#06130B', fontWeight: '900' },
+});
