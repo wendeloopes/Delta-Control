@@ -11,7 +11,8 @@ export type Movement = {
   demo?: boolean;
   fixed?: boolean;
   note?: string;
-  category?: string;\n  source?: 'voz' | 'texto' | 'manual';
+  category?: string;
+  source?: 'voz' | 'texto' | 'manual';
 };
 
 export type AppData = {
