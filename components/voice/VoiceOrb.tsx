@@ -14,6 +14,7 @@ type Props = {
 
 export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPressOut, onPress }: Props) {
   const pulse = useRef(new Animated.Value(0)).current;
+  const ambient = useRef(new Animated.Value(0)).current;
   const voice = useRef(new Animated.Value(0)).current;
   const flash = useRef(new Animated.Value(0)).current;
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -29,11 +30,22 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
     return () => subscription.remove();
   }, []);
 
-  // The ribbons react only to the measured microphone level; never rotate autonomously.
+  // Ambient motion keeps the orb alive while waiting; microphone energy is layered on top while listening.
   useEffect(() => {
     const target = listening ? Math.max(0, Math.min(1, level)) : 0;
     Animated.spring(voice, { toValue: target, speed: 22, bounciness: 5, useNativeDriver: true }).start();
   }, [level, listening, voice]);
+
+  useEffect(() => {
+    ambient.stopAnimation();
+    if (reduceMotion) { ambient.setValue(0.5); return; }
+    const ambientLoop = Animated.loop(Animated.sequence([
+      Animated.timing(ambient, { toValue: 1, duration: 2300, useNativeDriver: true }),
+      Animated.timing(ambient, { toValue: 0, duration: 2700, useNativeDriver: true }),
+    ]));
+    ambientLoop.start();
+    return () => ambientLoop.stop();
+  }, [ambient, reduceMotion]);
 
   useEffect(() => {
     pulse.stopAnimation();
@@ -69,9 +81,16 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
     ]).start();
   }, [flash, reduceMotion, state]);
 
-  const waveY = voice.interpolate({ inputRange: [0, 1], outputRange: [0, -13] });
-  const waveScale = voice.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1.12] });
-  const waveOpacity = voice.interpolate({ inputRange: [0, 0.08, 1], outputRange: [0.22, 0.35, 1] });
+  const ambientY = ambient.interpolate({ inputRange: [0, 1], outputRange: [5, -5] });
+  const ambientScale = ambient.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1.12] });
+  const ambientTilt = ambient.interpolate({ inputRange: [0, 1], outputRange: ['-2deg', '2deg'] });
+  const voiceY = voice.interpolate({ inputRange: [0, 1], outputRange: [0, -12] });
+  const voiceScale = voice.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] });
+  const waveY = Animated.add(ambientY, voiceY);
+  const waveScale = Animated.multiply(ambientScale, voiceScale);
+  const waveOpacity = listening
+    ? voice.interpolate({ inputRange: [0, 0.08, 1], outputRange: [0.82, 0.9, 1] })
+    : processing ? 0.96 : 0.92;
   const haloOpacity = error || state === 'success'
     ? flash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.62] })
     : listening
@@ -132,7 +151,7 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
             <Circle cx="184" cy="81" r="1.7" fill="#A8B9FF" opacity="0.85" />
             <Circle cx="17" cy="74" r="1.4" fill="#43EFFF" opacity="0.75" />
           </Svg>
-          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { opacity: waveOpacity, transform: [{ translateY: waveY }, { scaleY: waveScale }] }]}>
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { opacity: waveOpacity, transform: [{ translateY: waveY }, { scaleY: waveScale }, { rotate: ambientTilt }] }]}>
             <Svg width={size} height={size} viewBox="0 0 200 200">
               <Defs>
                 <LinearGradient id="orbWaveA" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -148,6 +167,7 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
                 </LinearGradient>
               </Defs>
               <Path d="M8 96 C38 67 55 71 83 91 C107 108 126 112 151 92 C169 78 184 82 192 97 C168 119 146 123 119 107 C91 91 72 87 49 103 C29 117 16 111 8 96Z" fill="url(#orbWaveB)" opacity="0.95" />
+              <Path d="M7 101 C27 78 53 79 78 96 C104 113 128 119 154 99 C173 84 187 91 193 102 C172 125 146 130 119 113 C91 96 69 91 45 111 C27 124 13 115 7 101Z" fill="url(#orbWaveB)" opacity="0.42" />
               <Path d="M5 101 C31 88 48 92 72 99 C95 106 109 108 132 99 C158 88 177 90 195 101 C173 111 155 112 131 105 C108 98 92 97 69 106 C43 116 23 112 5 101Z" fill="url(#orbWaveA)" />
               <Path d="M8 102 C44 98 57 101 81 104 C111 108 132 99 158 98 C173 98 184 100 192 103" fill="none" stroke="#FFFFFF" strokeOpacity="0.92" strokeWidth="2.2" />
             </Svg>
