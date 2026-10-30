@@ -8,6 +8,8 @@ const cases: Array<{ input: string; type: 'gasto' | 'ganho' | 'investimento' | n
   { input: 'investi 200 reais', type: 'investimento', amount: 200 },
   { input: 'comprei um tênis de 300 em 3 vezes', type: 'gasto', amount: 300, installments: 3 },
   { input: 'gastei 10,50 ontem na padaria', type: 'gasto', amount: 10.5 },
+  { input: 'gastei um mil e quinhentos no mercado', type: 'gasto', amount: 1500, category: 'Alimentação' },
+  { input: 'gastei 1,5 mil no mercado', type: 'gasto', amount: 1500, category: 'Alimentação' },
   { input: 'bla bla', type: null },
 ];
 
@@ -21,3 +23,5 @@ export function runParseCommandTests(): void {
     if (item.installments && parsed?.installments !== item.installments) throw new Error('Parcelas incorretas: ' + item.input);
   }
 }
+
+runParseCommandTests();
