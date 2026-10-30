@@ -40,11 +40,11 @@ export default function StatsScreen() {
   const totalCat = categories.reduce((a, x) => a + x[1], 0);
   const circumference = 2 * Math.PI * 48;
   let accumulated = 0;
-  const elapsed = isCurrentMonth ? Math.max(1, now.getDate()) : month < new Date(now.getFullYear(), now.getMonth(), 1) ? daysInMonth : 1;
+  const elapsed = isCurrentMonth ? Math.max(1, now.getDate()) : month.getTime() < new Date(now.getFullYear(), now.getMonth(), 1).getTime() ? daysInMonth : 1;
   const remaining = isCurrentMonth ? Math.max(0, daysInMonth - now.getDate()) : 0;
   const average = totals.expense / elapsed;
   const forecast = totals.balance - average * remaining;
-  const daysLabel = !isCurrentMonth ? (month < new Date(now.getFullYear(), now.getMonth(), 1) ? 'Mês fechado' : 'Mês futuro') : remaining === 0 ? 'Último dia' : `Faltam ${remaining} dias`;
+  const daysLabel = !isCurrentMonth ? (month.getTime() < new Date(now.getFullYear(), now.getMonth(), 1).getTime() ? 'Mês fechado' : 'Mês futuro') : remaining === 0 ? 'Último dia' : `Faltam ${remaining} dias`;
   const installments = movements.filter(x => x.type === 'saida' && !!x.installment);
   const savings = totals.income > 0 ? percentWidth(Math.max(0, totals.income - totals.expense - totals.invested), totals.income) : '—';
   const investedPercent = totals.income > 0 ? percentWidth(totals.invested, totals.income) : '—';
@@ -76,7 +76,7 @@ export default function StatsScreen() {
         <Mini icon="speedometer-outline" value={money(average)} caption="gasto médio por dia"/>
       </View>
       {installments.length > 0 && <Card><View style={s.cardHeading}><Text style={s.cardTitle}>Parcelamentos</Text><Text style={s.cardMeta}>{money(installments.reduce((a, x) => a + x.amount, 0))} neste mês</Text></View>
-        {installments.map(m => <View key={m.id} style={s.installmentRow}><Ionicons name="layers-outline" color={C.green} size={20}/><View style={{ flex: 1 }}><Text style={s.rowTitle}>{m.description}</Text><Text style={s.rowSub}>{m.installment}</Text><View style={s.track}><View style={[s.fill, { width: '50%' }]}/></View></View><Text style={s.installmentValue}>{money(m.amount)}</Text></View>)}
+        {installments.map(m => <View key={m.id} style={s.installmentRow}><Ionicons name="layers-outline" color={C.green} size={20}/><View style={{ flex: 1 }}><Text style={s.rowTitle}>{m.description}</Text><Text style={s.rowSub}>{m.installment}</Text></View><Text style={s.installmentValue}>{money(m.amount)}</Text></View>)}
       </Card>}
       <Card>
         <View style={s.cardHeading}><Text style={s.cardTitle}>Gastos por categoria</Text><Text style={s.cardMeta}>{categories.length} categorias</Text></View>
