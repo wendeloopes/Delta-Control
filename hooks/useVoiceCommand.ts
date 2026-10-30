@@ -15,6 +15,7 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
   const [level, setLevel] = useState(0);
   const transcriptRef = useRef('');
   const startCancelledRef = useRef(false);
+  const startPendingRef = useRef(false);
   const ignoreEndRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onCommandRef = useRef(onCommand);
@@ -73,7 +74,8 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
   });
 
   const start = useCallback(async () => {
-    if (state === 'listening' || state === 'processing') return true;
+    if (state === 'listening' || state === 'processing' || startPendingRef.current) return true;
+    startPendingRef.current = true;
     startCancelledRef.current = false;
     ignoreEndRef.current = false;
     setError('');
@@ -102,6 +104,8 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
       setState('error');
       setError('Reconhecimento de voz indisponível agora');
       return false;
+    } finally {
+      startPendingRef.current = false;
     }
   }, [state]);
 
