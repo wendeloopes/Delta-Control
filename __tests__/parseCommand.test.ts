@@ -16,7 +16,7 @@ const cases: Array<{ input: string; type: 'gasto' | 'ganho' | 'investimento' | n
 export function runParseCommandTests(): void {
   for (const item of cases) {
     const parsed = parseCommand(item.input, new Date(2026, 9, 30, 12));
-    if (parsed?.type !== item.type) throw new Error('Tipo incorreto: ' + item.input);
+    if ((parsed?.type ?? null) !== item.type) throw new Error('Tipo incorreto: ' + item.input);
     if (item.amount !== undefined && parsed?.amount !== item.amount) throw new Error('Valor incorreto: ' + item.input + ' => ' + parsed?.amount);
     if (item.category && parsed?.category !== item.category) throw new Error('Categoria incorreta: ' + item.input);
     if (item.description && parsed?.description !== item.description) throw new Error('Descrição incorreta: ' + item.input + ' => ' + parsed?.description);
