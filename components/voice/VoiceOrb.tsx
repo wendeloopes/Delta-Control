@@ -6,16 +6,20 @@ export type VoiceOrbState = 'idle' | 'listening' | 'processing' | 'success' | 'e
 type Props = {
   state: VoiceOrbState;
   level?: number;
+  bass?: number;
+  treble?: number;
   size?: number;
   onPressIn?: () => void;
   onPressOut?: () => void;
   onPress?: () => void;
 };
 
-export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPressOut, onPress }: Props) {
+export default function VoiceOrb({ state, level = 0, bass = 0, treble = 0, size = 190, onPressIn, onPressOut, onPress }: Props) {
   const pulse = useRef(new Animated.Value(0)).current;
   const ambient = useRef(new Animated.Value(0)).current;
   const voice = useRef(new Animated.Value(0)).current;
+  const lowBand = useRef(new Animated.Value(0)).current;
+  const highBand = useRef(new Animated.Value(0)).current;
   const flash = useRef(new Animated.Value(0)).current;
   const [reduceMotion, setReduceMotion] = useState(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -34,7 +38,9 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
   useEffect(() => {
     const target = listening ? Math.max(0, Math.min(1, level)) : 0;
     Animated.spring(voice, { toValue: target, speed: 22, bounciness: 5, useNativeDriver: true }).start();
-  }, [level, listening, voice]);
+    Animated.spring(lowBand, { toValue: listening ? bass : 0, speed: 12, bounciness: 8, useNativeDriver: true }).start();
+    Animated.spring(highBand, { toValue: listening ? treble : 0, speed: 32, bounciness: 3, useNativeDriver: true }).start();
+  }, [level, bass, treble, listening, voice, lowBand, highBand]);
 
   useEffect(() => {
     ambient.stopAnimation();
@@ -86,6 +92,8 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
   const ambientTilt = ambient.interpolate({ inputRange: [0, 1], outputRange: ['-2deg', '2deg'] });
   const voiceY = voice.interpolate({ inputRange: [0, 1], outputRange: [0, -12] });
   const voiceScale = voice.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] });
+  const bassScale = lowBand.interpolate({ inputRange: [0, 1], outputRange: [1, 1.42] });
+  const trebleScale = highBand.interpolate({ inputRange: [0, 1], outputRange: [1, 1.55] });
   const waveY = Animated.add(ambientY, voiceY);
   const waveScale = Animated.multiply(ambientScale, voiceScale);
   const waveOpacity = listening
@@ -170,6 +178,17 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
               <Path d="M7 101 C27 78 53 79 78 96 C104 113 128 119 154 99 C173 84 187 91 193 102 C172 125 146 130 119 113 C91 96 69 91 45 111 C27 124 13 115 7 101Z" fill="url(#orbWaveB)" opacity="0.42" />
               <Path d="M5 101 C31 88 48 92 72 99 C95 106 109 108 132 99 C158 88 177 90 195 101 C173 111 155 112 131 105 C108 98 92 97 69 106 C43 116 23 112 5 101Z" fill="url(#orbWaveA)" />
               <Path d="M8 102 C44 98 57 101 81 104 C111 108 132 99 158 98 C173 98 184 100 192 103" fill="none" stroke="#FFFFFF" strokeOpacity="0.92" strokeWidth="2.2" />
+            </Svg>
+          </Animated.View>
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { opacity: listening ? highBand.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.95] }) : 0.18, transform: [{ scaleY: trebleScale }, { scaleX: 1.04 }] }]}>
+            <Svg width={size} height={size} viewBox="0 0 200 200">
+              <Path d="M8 100 C24 100 28 91 39 100 S55 109 67 100 S82 89 94 100 S109 111 121 100 S137 88 149 100 S165 111 177 100 S188 96 192 100" fill="none" stroke="#FFFFFF" strokeWidth="2.1" strokeOpacity="0.95" />
+              <Path d="M8 100 C24 100 28 91 39 100 S55 109 67 100 S82 89 94 100 S109 111 121 100 S137 88 149 100 S165 111 177 100 S188 96 192 100" fill="none" stroke="#20EFFF" strokeWidth="5" strokeOpacity="0.28" />
+            </Svg>
+          </Animated.View>
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { opacity: listening ? lowBand.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.75] }) : 0.12, transform: [{ scaleY: bassScale }] }]}>
+            <Svg width={size} height={size} viewBox="0 0 200 200">
+              <Path d="M8 100 C32 75 53 78 78 98 C103 119 128 122 153 99 C171 83 185 88 192 100 C174 121 148 130 120 112 C91 94 69 90 45 111 C27 125 13 114 8 100Z" fill="url(#orbWaveB)" />
             </Svg>
           </Animated.View>
         </View>
