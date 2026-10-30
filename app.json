@@ -6,9 +6,27 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "plugins": ["expo-router"],
-    "experiments": {"typedRoutes": true},
-    "android": {"package": "com.deltacontrol.app"},
-    "ios": {"bundleIdentifier": "com.deltacontrol.app"}
+    "plugins": [
+      "expo-router",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "O Delta Control usa o microfone para registrar seus lançamentos por voz.",
+          "speechRecognitionPermission": "O Delta Control usa o reconhecimento de fala para interpretar seus lançamentos.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "android": {
+      "package": "com.deltacontrol.app"
+    },
+    "ios": {
+      "bundleIdentifier": "com.deltacontrol.app"
+    }
   }
 }
