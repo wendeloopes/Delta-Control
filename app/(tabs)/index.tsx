@@ -26,7 +26,7 @@ export default function HomeScreen() {
     const invested = monthMovements.filter(m => m.type === 'investimento').reduce((a, m) => a + m.amount, 0);
     return { income, expense, invested, balance: income - expense };
   }, [monthMovements]);
-  const progress = totals.income > 0 ? Math.min(totals.expense / totals.income, 1) : totals.expense > 0 ? 1 : 0;
+  const progress = totals.income > 0 ? Math.min(totals.expense / totals.income, 1) : totals.expense > 0 ? 1 : 0;\n  const progressWidth: `${number}%` = `${progress * 100}%`;
   async function addCommand() {
     const parsed = parseQuickCommand(command);
     if (!parsed) { Alert.alert('Comando não reconhecido', 'Ex.: entrada 150 venda, saída 29,90 almoço ou investi 100 reserva.'); return; }
@@ -49,7 +49,7 @@ export default function HomeScreen() {
       <View style={s.balanceBlock}>
         <Text style={s.label}>SALDO</Text>
         <Text adjustsFontSizeToFit numberOfLines={1} style={[s.balance, { color: balanceColor, fontSize: width < 350 ? 43 : 53 }]}>{balanceText}</Text>
-        <View style={s.progress}><View style={[s.progressFill, { width: (progress * 100) + '%' as `${number}%`, backgroundColor: balanceColor }]} /></View>
+        <View style={s.progress}><View style={[s.progressFill, { width: progressWidth, backgroundColor: balanceColor }]} /></View>
         <View style={s.metrics}>
           <View style={s.metric}><View style={s.metricLabelRow}><View style={[s.dot, { backgroundColor: C.mint }]} /><Text style={s.metricLabel}>Entrou</Text></View><Text style={s.metricValue}>{money(totals.income)}</Text></View>
           <View style={s.metric}><View style={s.metricLabelRow}><View style={[s.dot, { backgroundColor: C.red }]} /><Text style={s.metricLabel}>Gastou</Text></View><Text style={s.metricValue}>{money(totals.expense)}</Text></View>
