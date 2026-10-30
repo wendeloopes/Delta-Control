@@ -4,7 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C, Card, Page } from '../../components/ui';
 import { AppData, loadAppData, saveAppData } from '../../lib/storage';
-import { parseQuickCommand } from '../../lib/commands';
+import { parseCommand } from '../../lib/parseCommand';
 
 const money = (n: number) => (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const greeting = () => { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; };
@@ -37,7 +37,17 @@ export default function HomeScreen() {
     if (!parsed) { Alert.alert('Comando não reconhecido', 'Ex.: entrada 150 venda, saída 29,90 almoço ou investi 100 reserva.'); return; }
     try {
       const current = data ?? await loadAppData();
-      const next = { ...current, movements: [{ ...parsed, id: Date.now().toString(), createdAt: new Date().toISOString() }, ...current.movements] };
+      const next = { ...current, movements: [{
+        id: Date.now().toString(),
+        type: parsed.type === 'gasto' ? 'saida' as const : parsed.type === 'ganho' ? 'entrada' as const : 'investimento' as const,
+        amount: parsed.amount,
+        description: parsed.description,
+        category: parsed.category,
+        installment: parsed.installments ? parsed.installments + 'x' : undefined,
+        createdAt: parsed.date.toISOString(),
+        paid: true,
+        source: 'texto' as const,
+      }, ...current.movements] };
       await saveAppData(next); setData(next); setCommand(''); setVisible(false);
       Alert.alert('Salvo', 'Registro adicionado ao dispositivo.');
     } catch { Alert.alert('Erro', 'Não foi possível salvar.'); }
