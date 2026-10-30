@@ -26,7 +26,7 @@ export default function HomeScreen() {
     const invested = monthMovements.filter(m => m.type === 'investimento').reduce((a, m) => a + m.amount, 0);
     return { income, expense, invested, balance: income - expense };
   }, [monthMovements]);
-  const progress = totals.income > 0 ? Math.min(totals.expense / totals.income, 1) : totals.expense > 0 ? 1 : 0;\n  const progressWidth: `${number}%` = `${progress * 100}%`;
+  const progress = totals.income > 0 ? Math.min(totals.expense / totals.income, 1) : totals.expense > 0 ? 1 : 0;\n  const progressWidth: `${number}%` = `${progress * 100}%`;\n  const today = new Date();\n  const remainingDays = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();\n  const dailyAverage = totals.expense / Math.max(1, today.getDate());\n  const forecast = totals.balance - dailyAverage * remainingDays;
   async function addCommand() {
     const parsed = parseQuickCommand(command);
     if (!parsed) { Alert.alert('Comando não reconhecido', 'Ex.: entrada 150 venda, saída 29,90 almoço ou investi 100 reserva.'); return; }
@@ -55,7 +55,7 @@ export default function HomeScreen() {
           <View style={s.metric}><View style={s.metricLabelRow}><View style={[s.dot, { backgroundColor: C.red }]} /><Text style={s.metricLabel}>Gastou</Text></View><Text style={s.metricValue}>{money(totals.expense)}</Text></View>
           <View style={s.metric}><View style={s.metricLabelRow}><View style={[s.dot, { backgroundColor: C.blue }]} /><Text style={s.metricLabel}>Investiu</Text></View><Text style={s.metricValue}>{money(totals.invested)}</Text></View>
         </View>
-        <View style={s.forecast}><Ionicons name="calendar-outline" color={C.muted} size={15}/><Text style={s.forecastLabel}>Saldo previsto no fim do mês:</Text><Text style={[s.forecastValue, { color: balanceColor }]}>{money(totals.balance)}</Text></View>
+        <View style={s.forecast}><Ionicons name="calendar-outline" color={C.muted} size={15}/><Text style={s.forecastLabel}>Saldo previsto no fim do mês:</Text><Text style={[s.forecastValue, { color: balanceColor }]}>{money(forecast)}</Text></View>
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Abrir comando textual" onPress={() => setVisible(true)} onLongPress={() => setVisible(true)} delayLongPress={250} style={({ pressed }) => [s.logoArea, pressed && { transform: [{ scale: 1.02 }] }]}>
         <View style={s.glow} /><View style={s.logoOuter}/><View style={s.logoInner}/><View style={s.logoCore}><Ionicons name="mic-outline" color={C.text} size={34}/></View>
