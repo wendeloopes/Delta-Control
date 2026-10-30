@@ -67,11 +67,11 @@ export default function MovementsScreen() {
       {show('Gastos') && <Section title="Gastos" count={expenses.length} total={sum(expenses)} color={C.red} chip={pending ? pending + ' a confirmar' : undefined}>
         {expenses.length === 0 ? <Empty title="Nenhum gasto ainda" hint="Fale na aba Voz ou toque no +"/> :
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-            {expenses.map(m => <Pressable key={m.id} onPress={() => openEditor(m)} style={s.expenseWrap}><Card style={s.expenseCard}>
+            {expenses.map(m => <View key={m.id} style={s.expenseWrap}><Pressable onPress={() => openEditor(m)}><Card style={s.expenseCard}>
               <View style={s.expenseTop}><View style={s.categoryIcon}><Ionicons name={categoryIcon(m) as any} color={C.yellow} size={21}/></View>{m.installment ? <Text style={s.installment}><Ionicons name="layers-outline" color={C.green} size={11}/> {m.installment}</Text> : null}</View>
               <Text style={s.value}>{money(m.amount)}</Text><Text numberOfLines={2} style={s.description}>{m.description}</Text>
               <View style={s.cardFooter}><Text style={s.date}>{new Date(m.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}</Text><Ionicons name="chatbubble-outline" color={C.muted} size={15}/></View>
-            </Card>
+            </Card></Pressable>
             {m.paid === false ? <Pressable onPress={() => togglePaid(m)} style={s.payButton}><Ionicons name="radio-button-off" color={C.muted} size={15}/><Text style={s.payText}>Marcar pago</Text></Pressable> : <View style={[s.payButton, s.paidButton]}><Ionicons name="checkmark-circle" color={C.mint} size={15}/><Text style={[s.payText, { color: C.mint }]}>Pago</Text></View>}</View>)}
           </ScrollView>}
       </Section>}
