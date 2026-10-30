@@ -14,6 +14,7 @@ export default function MovementsScreen() {
   const [kind, setKind] = useState<'entrada' | 'saida' | 'investimento'>('saida');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [editing, setEditing] = useState<Movement | null>(null);
   const [offset, setOffset] = useState(0);
   const refresh = useCallback(() => { loadAppData().then(setData).catch(() => Alert.alert('Erro', 'Não foi possível carregar os registros.')); }, []);
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
@@ -27,14 +28,22 @@ export default function MovementsScreen() {
   const investments = list.filter(m => m.type === 'investimento');
   const pending = expenses.filter(m => m.paid === false).length;
   const sum = (items: Movement[]) => items.reduce((a, m) => a + m.amount, 0);
+  function openEditor(item?: Movement) {
+    setEditing(item ?? null);
+    setKind(item?.type ?? 'saida');
+    setAmount(item ? String(item.amount).replace('.', ',') : '');
+    setDescription(item?.description ?? '');
+    setVisible(true);
+  }
   async function add() {
     const value = Number(amount.replace(/\\./g, '').replace(',', '.'));
     if (!description.trim() || !Number.isFinite(value) || value <= 0) { Alert.alert('Confira os dados', 'Informe descrição e valor maior que zero.'); return; }
     try {
       const current = data ?? await loadAppData();
-      const item: Movement = { id: Date.now().toString(), type: kind, amount: value, description: description.trim(), createdAt: new Date().toISOString(), paid: kind !== 'saida' };
-      const next = { ...current, movements: [item, ...current.movements] };
-      await saveAppData(next); setData(next); setVisible(false); setAmount(''); setDescription('');
+      const item: Movement = { ...(editing ?? {} as Movement), id: editing?.id ?? Date.now().toString(), type: kind, amount: value, description: description.trim(), createdAt: editing?.createdAt ?? new Date().toISOString(), paid: kind !== 'saida' ? true : (editing?.paid ?? false), demo: editing?.demo ?? false };
+      const movements = editing ? current.movements.map(m => m.id === editing.id ? item : m) : [item, ...current.movements];
+      const next = { ...current, movements };
+      await saveAppData(next); setData(next); setVisible(false); setAmount(''); setDescription(''); setEditing(null);
     } catch { Alert.alert('Erro', 'Não foi possível salvar.'); }
   }
   async function togglePaid(item: Movement) {
@@ -58,7 +67,7 @@ export default function MovementsScreen() {
       {show('Gastos') && <Section title="Gastos" count={expenses.length} total={sum(expenses)} color={C.red} chip={pending ? pending + ' a confirmar' : undefined}>
         {expenses.length === 0 ? <Empty title="Nenhum gasto ainda" hint="Fale na aba Voz ou toque no +"/> :
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-            {expenses.map(m => <View key={m.id} style={s.expenseWrap}><Card style={s.expenseCard}>
+            {expenses.map(m => <Pressable key={m.id} onPress={() => openEditor(m)} style={s.expenseWrap}><Card style={s.expenseCard}>
               <View style={s.expenseTop}><View style={s.categoryIcon}><Ionicons name={categoryIcon(m) as any} color={C.yellow} size={21}/></View>{m.installment ? <Text style={s.installment}><Ionicons name="layers-outline" color={C.green} size={11}/> {m.installment}</Text> : null}</View>
               <Text style={s.value}>{money(m.amount)}</Text><Text numberOfLines={2} style={s.description}>{m.description}</Text>
               <View style={s.cardFooter}><Text style={s.date}>{new Date(m.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}</Text><Ionicons name="chatbubble-outline" color={C.muted} size={15}/></View>
@@ -66,19 +75,19 @@ export default function MovementsScreen() {
             {m.paid === false ? <Pressable onPress={() => togglePaid(m)} style={s.payButton}><Ionicons name="radio-button-off" color={C.muted} size={15}/><Text style={s.payText}>Marcar pago</Text></Pressable> : <View style={[s.payButton, s.paidButton]}><Ionicons name="checkmark-circle" color={C.mint} size={15}/><Text style={[s.payText, { color: C.mint }]}>Pago</Text></View>}</View>)}
           </ScrollView>}
       </Section>}
-      {show('Ganhos') && <Section title="Ganhos" count={incomes.length} total={sum(incomes)} color={C.mint}>{incomes.length ? incomes.map(m => <MovementRow key={m.id} item={m} color={C.mint}/>) : <Empty title="Nada em ganhos ainda" hint="Fale na aba Voz ou toque no +"/>}</Section>}
-      {show('Investimentos') && <Section title="Investimentos" count={investments.length} total={sum(investments)} color={C.blue}>{investments.length ? investments.map(m => <MovementRow key={m.id} item={m} color={C.blue}/>) : <Empty title="Nada em investimentos ainda" hint="Fale na aba Voz ou toque no +"/>}</Section>}
+      {show('Ganhos') && <Section title="Ganhos" count={incomes.length} total={sum(incomes)} color={C.mint}>{incomes.length ? incomes.map(m => <MovementRow key={m.id} item={m} color={C.mint} onPress={() => openEditor(m)}/>) : <Empty title="Nada em ganhos ainda" hint="Fale na aba Voz ou toque no +"/>}</Section>}
+      {show('Investimentos') && <Section title="Investimentos" count={investments.length} total={sum(investments)} color={C.blue}>{investments.length ? investments.map(m => <MovementRow key={m.id} item={m} color={C.blue} onPress={() => openEditor(m)}/>) : <Empty title="Nada em investimentos ainda" hint="Fale na aba Voz ou toque no +"/>}</Section>}
     </ScrollView>
-    <Pressable onPress={() => setVisible(true)} style={s.fab}><Ionicons name="add" color="#06130B" size={30}/></Pressable>
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}><View style={s.backdrop}><View style={s.modal}><View style={s.handle}/><Text style={s.modalTitle}>Novo registro</Text>
+    <Pressable onPress={() => openEditor()} style={s.fab}><Ionicons name="add" color="#06130B" size={30}/></Pressable>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}><View style={s.backdrop}><View style={s.modal}><View style={s.handle}/><Text style={s.modalTitle}>{editing ? 'Editar registro' : 'Novo registro'}</Text>
       <View style={s.kindRow}>{([{ v: 'saida', t: 'Gasto' }, { v: 'entrada', t: 'Ganho' }, { v: 'investimento', t: 'Investir' }] as const).map(k => <Pressable key={k.v} onPress={() => setKind(k.v)} style={[s.kind, kind === k.v && s.kindActive]}><Text style={[s.kindText, kind === k.v && { color: C.green }]}>{k.t}</Text></Pressable>)}</View>
       <TextInput value={description} onChangeText={setDescription} placeholder="Descrição" placeholderTextColor={C.tertiary} style={s.input}/><TextInput value={amount} onChangeText={setAmount} placeholder="Valor (ex.: 120,50)" placeholderTextColor={C.tertiary} keyboardType="decimal-pad" style={s.input}/>
-      <Pressable onPress={add} style={s.save}><Text style={s.saveText}>Salvar registro</Text></Pressable><Pressable onPress={() => setVisible(false)} style={{ padding: 13, alignItems: 'center' }}><Text style={{ color: C.muted }}>Cancelar</Text></Pressable>
+      <Pressable onPress={add} style={s.save}><Text style={s.saveText}>{editing ? 'Salvar alterações' : 'Salvar registro'}</Text></Pressable><Pressable onPress={() => setVisible(false)} style={{ padding: 13, alignItems: 'center' }}><Text style={{ color: C.muted }}>Cancelar</Text></Pressable>
     </View></View></Modal>
   </Page>;
 }
-function MovementRow({ item, color }: { item: Movement; color: string }) {
-  return <View style={s.row}><View style={s.categoryIcon}><Ionicons name="ellipse-outline" color={color} size={20}/></View><View style={{ flex: 1 }}><Text style={s.description}>{item.description}</Text><Text style={s.date}>{new Date(item.createdAt).toLocaleDateString('pt-BR')}</Text></View><Text style={[s.valueSmall, { color }]}>{money(item.amount)}</Text></View>;
+function MovementRow({ item, color, onPress }: { item: Movement; color: string; onPress?: () => void }) {
+  return <Pressable onPress={onPress} style={s.row}><View style={s.categoryIcon}><Ionicons name="ellipse-outline" color={color} size={20}/></View><View style={{ flex: 1 }}><Text style={s.description}>{item.description}</Text><Text style={s.date}>{new Date(item.createdAt).toLocaleDateString('pt-BR')}</Text></View><Text style={[s.valueSmall, { color }]}>{money(item.amount)}</Text></Pressable>;
 }
 const s = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
