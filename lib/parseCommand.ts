@@ -106,7 +106,7 @@ export function parseCommand(input: string, now: Date = new Date()): ParsedComma
   if (amount === null || !Number.isFinite(amount) || amount <= 0 || (installments !== undefined && (installments < 2 || installments > 48))) return null;
   text = text
     .replace(/\b(r\$|reais?|contos?)\b/g, ' ')
-    .replace(/\b(gastei|paguei|comprei|pago|despesa|saiu|debitei|recebi|ganhei|entrou|salario|renda|vendi|caiu|entrada|investi|apliquei|aportei|guardei|investimento|saida|compra)\b/g, ' ')
+    .replace(/\b(gastei|paguei|comprei|pago|despesa|saiu|debitei|recebi|ganhei|entrou|vendi|caiu|entrada|investi|apliquei|aportei|guardei|investimento|saida|compra)\b/g, ' ')
     .replace(/\b(no|na|em|de|do|da|dos|das|com|para|por|e|um|uma|uns|umas)\b/g, ' ')
     .replace(/\s+/g, ' ').trim();
   const description = text ? text.charAt(0).toUpperCase() + text.slice(1) : (type === 'investimento' ? 'Investimento' : type === 'ganho' ? 'Entrada' : 'Gasto');
