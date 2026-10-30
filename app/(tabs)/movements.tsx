@@ -32,6 +32,7 @@ export default function MovementsScreen() {
   const incomes = list.filter(m => m.type === 'entrada');
   const investments = list.filter(m => m.type === 'investimento');
   const pending = expenses.filter(m => m.paid === false).length;
+  const fixedExpenses = expenses.filter(m => m.fixed === true);
   const sum = (items: Movement[]) => items.reduce((a, m) => a + m.amount, 0);
   function openEditor(item?: Movement) {
     setEditing(item ?? null);
@@ -75,7 +76,7 @@ export default function MovementsScreen() {
       {(['Tudo', 'Gastos', 'Ganhos', 'Investimentos'] as Filter[]).map(f => <Pressable key={f} onPress={() => setFilter(f)} style={[s.pill, filter === f && s.pillActive]}><Text style={[s.pillText, filter === f && s.pillTextActive]}>{f}</Text></Pressable>)}
     </ScrollView>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 150 }}>
-      {show('Tudo') && <Section title="Fixos" count={0} total={0} color={C.green}><Empty title="Nenhum fixo ainda" hint="Ao lançar, ligue “Fixo” para repetir todo mês"/></Section>}
+      {show('Tudo') && <Section title="Fixos" count={fixedExpenses.length} total={sum(fixedExpenses)} color={C.green}>{fixedExpenses.length ? fixedExpenses.map(m => <MovementRow key={m.id} item={m} color={C.green} onPress={() => openEditor(m)}/>) : <Empty title="Nenhum fixo ainda" hint="Ao lançar, ligue “Fixo” para identificar gastos recorrentes"/>}</Section>}
       {show('Gastos') && <Section title="Gastos" count={expenses.length} total={sum(expenses)} color={C.red} chip={pending ? pending + ' a confirmar' : undefined}>
         {expenses.length === 0 ? <Empty title="Nenhum gasto ainda" hint="Fale na aba Voz ou toque no +"/> :
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
