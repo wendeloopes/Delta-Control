@@ -31,6 +31,21 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
   }, []);
 
   useEffect(() => {
+    if (state !== 'error' && state !== 'success') {
+      flash.stopAnimation();
+      flash.setValue(0);
+      return;
+    }
+    if (reduceMotion) { flash.setValue(0.35); return; }
+    flash.setValue(0);
+    Animated.sequence([
+      Animated.timing(flash, { toValue: 1, duration: 90, useNativeDriver: true }),
+      Animated.delay(state === 'success' ? 210 : 510),
+      Animated.timing(flash, { toValue: 0, duration: 90, useNativeDriver: true }),
+    ]).start();
+  }, [flash, reduceMotion, state]);
+
+  useEffect(() => {
     pulse.stopAnimation();
     rotate.stopAnimation();
     waveShift.stopAnimation();
