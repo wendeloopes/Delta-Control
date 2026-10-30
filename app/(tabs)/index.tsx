@@ -26,7 +26,12 @@ export default function HomeScreen() {
     const invested = monthMovements.filter(m => m.type === 'investimento').reduce((a, m) => a + m.amount, 0);
     return { income, expense, invested, balance: income - expense };
   }, [monthMovements]);
-  const progress = totals.income > 0 ? Math.min(totals.expense / totals.income, 1) : totals.expense > 0 ? 1 : 0;\n  const progressWidth: `${number}%` = `${progress * 100}%`;\n  const today = new Date();\n  const remainingDays = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();\n  const dailyAverage = totals.expense / Math.max(1, today.getDate());\n  const forecast = totals.balance - dailyAverage * remainingDays;
+  const progress = totals.income > 0 ? Math.min(totals.expense / totals.income, 1) : totals.expense > 0 ? 1 : 0;
+  const progressWidth: `${number}%` = `${progress * 100}%`;
+  const today = new Date();
+  const remainingDays = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
+  const dailyAverage = totals.expense / Math.max(1, today.getDate());
+  const forecast = totals.balance - dailyAverage * remainingDays;
   async function addCommand() {
     const parsed = parseQuickCommand(command);
     if (!parsed) { Alert.alert('Comando não reconhecido', 'Ex.: entrada 150 venda, saída 29,90 almoço ou investi 100 reserva.'); return; }
