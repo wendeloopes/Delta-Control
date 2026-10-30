@@ -1,6 +1,6 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C, Card, Page } from '../../components/ui';
 import { AppData, loadAppData, Movement, saveAppData } from '../../lib/storage';
@@ -8,6 +8,9 @@ import { AppData, loadAppData, Movement, saveAppData } from '../../lib/storage';
 const money = (n: number) => (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 type Filter = 'Tudo' | 'Gastos' | 'Ganhos' | 'Investimentos';
 export default function MovementsScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ editId?: string }>();
+  const handledEditId = useRef<string | null>(null);
   const [data, setData] = useState<AppData | null>(null);
   const [filter, setFilter] = useState<Filter>('Tudo');
   const [visible, setVisible] = useState(false);
@@ -44,6 +47,13 @@ export default function MovementsScreen() {
     setFixed(item?.fixed ?? false); setPaid(item ? item.paid !== false : false);
     setVisible(true);
   }
+  useEffect(() => {
+    const requestedId = typeof params.editId === 'string' ? params.editId : undefined;
+    if (!requestedId) { handledEditId.current = null; return; }
+    if (!data || handledEditId.current === requestedId) return;
+    const target = data.movements.find(item => item.id === requestedId);
+    if (target) { handledEditId.current = requestedId; openEditor(target); }
+  }, [data, params.editId]);
   async function add() {
     const value = Number(amount.replace(/\./g, '').replace(',', '.'));
     if (!description.trim() || !Number.isFinite(value) || value <= 0) { Alert.alert('Confira os dados', 'Informe descrição e valor maior que zero.'); return; }
@@ -56,7 +66,7 @@ export default function MovementsScreen() {
       const item: Movement = { ...(editing ?? {} as Movement), id: editing?.id ?? Date.now().toString(), type: kind, amount: value, description: description.trim(), createdAt: parsedDate.toISOString(), paid: kind !== 'saida' ? true : paid, fixed, category: category.trim() || undefined, note: note.trim() || undefined, installment: editing?.installment, demo: editing?.demo ?? false };
       const movements = editing ? current.movements.map(m => m.id === editing.id ? item : m) : [item, ...current.movements];
       const next = { ...current, movements };
-      await saveAppData(next); setData(next); setVisible(false); setAmount(''); setDescription(''); setEditing(null);
+      await saveAppData(next); setData(next); setVisible(false); router.setParams({ editId: undefined }); setAmount(''); setDescription(''); setEditing(null);
     } catch { Alert.alert('Erro', 'Não foi possível salvar.'); }
   }
   async function togglePaid(item: Movement) {
@@ -92,10 +102,10 @@ export default function MovementsScreen() {
       {show('Investimentos') && <Section title="Investimentos" count={investments.length} total={sum(investments)} color={C.blue}>{investments.length ? investments.map(m => <MovementRow key={m.id} item={m} color={C.blue} onPress={() => openEditor(m)}/>) : <Empty title="Nada em investimentos ainda" hint="Fale na aba Voz ou toque no +"/>}</Section>}
     </ScrollView>
     <Pressable onPress={() => openEditor()} style={s.fab}><Ionicons name="add" color="#06130B" size={30}/></Pressable>
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}><View style={s.backdrop}><View style={s.modal}><View style={s.handle}/><Text style={s.modalTitle}>{editing ? 'Editar registro' : 'Novo registro'}</Text>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { setVisible(false); router.setParams({ editId: undefined }); }}><View style={s.backdrop}><View style={s.modal}><View style={s.handle}/><Text style={s.modalTitle}>{editing ? 'Editar registro' : 'Novo registro'}</Text>
       <View style={s.kindRow}>{([{ v: 'saida', t: 'Gasto' }, { v: 'entrada', t: 'Ganho' }, { v: 'investimento', t: 'Investir' }] as const).map(k => <Pressable key={k.v} onPress={() => setKind(k.v)} style={[s.kind, kind === k.v && s.kindActive]}><Text style={[s.kindText, kind === k.v && { color: C.green }]}>{k.t}</Text></Pressable>)}</View>
       <TextInput value={description} onChangeText={setDescription} placeholder="Descrição" placeholderTextColor={C.tertiary} style={s.input}/><TextInput value={amount} onChangeText={setAmount} placeholder="Valor (ex.: 120,50)" placeholderTextColor={C.tertiary} keyboardType="decimal-pad" style={s.input}/><TextInput value={category} onChangeText={setCategory} placeholder="Categoria (opcional)" placeholderTextColor={C.tertiary} style={s.input}/><TextInput value={dateText} onChangeText={setDateText} placeholder="Data DD/MM/AAAA" placeholderTextColor={C.tertiary} keyboardType="numbers-and-punctuation" style={s.input}/><TextInput value={note} onChangeText={setNote} placeholder="Observação (opcional)" placeholderTextColor={C.tertiary} style={s.input}/><View style={s.kindRow}><Pressable onPress={() => setFixed(v => !v)} style={[s.kind, fixed && s.kindActive]}><Text style={[s.kindText, fixed && { color: C.green }]}>{fixed ? "✓ Fixo" : "Marcar fixo"}</Text></Pressable>{kind === "saida" ? <Pressable onPress={() => setPaid(v => !v)} style={[s.kind, paid && s.kindActive]}><Text style={[s.kindText, paid && { color: C.green }]}>{paid ? "✓ Pago" : "Pendente"}</Text></Pressable> : null}</View>
-      <Pressable onPress={add} style={s.save}><Text style={s.saveText}>{editing ? 'Salvar alterações' : 'Salvar registro'}</Text></Pressable><Pressable onPress={() => setVisible(false)} style={{ padding: 13, alignItems: 'center' }}><Text style={{ color: C.muted }}>Cancelar</Text></Pressable>
+      <Pressable onPress={add} style={s.save}><Text style={s.saveText}>{editing ? 'Salvar alterações' : 'Salvar registro'}</Text></Pressable><Pressable onPress={() => { setVisible(false); router.setParams({ editId: undefined }); }} style={{ padding: 13, alignItems: 'center' }}><Text style={{ color: C.muted }}>Cancelar</Text></Pressable>
     </View></View></Modal>
   </Page>;
 }
