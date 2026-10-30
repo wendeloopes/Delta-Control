@@ -1,10 +1,12 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C, Card, Page } from '../../components/ui';
 import { AppData, loadAppData, saveAppData } from '../../lib/storage';
-import { parseCommand } from '../../lib/parseCommand';
+import { parseCommand, ParsedCommand } from '../../lib/parseCommand';
+import VoiceOrb from '../../components/voice/VoiceOrb';
+import { useVoiceCommand } from '../../hooks/useVoiceCommand';
 
 const money = (n: number) => (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const greeting = () => { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; };
@@ -13,8 +15,37 @@ export default function HomeScreen() {
   const [data, setData] = useState<AppData | null>(null);
   const [visible, setVisible] = useState(false);
   const [command, setCommand] = useState('');
+  const [confirmation, setConfirmation] = useState<{ id: string; text: string } | null>(null);
+  const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const refresh = useCallback(() => { loadAppData().then(setData).catch(() => Alert.alert('Erro', 'Não foi possível carregar os dados.')); }, []);
+  const saveParsedCommand = useCallback(async (parsed: ParsedCommand, source: 'voz' | 'texto') => {
+    try {
+      const current = data ?? await loadAppData();
+      const id = Date.now().toString();
+      const item = {
+        id,
+        type: parsed.type === 'gasto' ? 'saida' as const : parsed.type === 'ganho' ? 'entrada' as const : 'investimento' as const,
+        amount: parsed.amount, description: parsed.description, category: parsed.category,
+        installment: parsed.installments ? parsed.installments + 'x' : undefined,
+        createdAt: parsed.date.toISOString(), paid: true, source,
+      };
+      const next = { ...current, movements: [item, ...current.movements] };
+      await saveAppData(next);
+      setData(next);
+      setConfirmation({ id, text: (parsed.type === 'gasto' ? 'Gasto' : parsed.type === 'ganho' ? 'Ganho' : 'Investimento') + ' · ' + money(parsed.amount) + ' · ' + parsed.description + ' · ' + parsed.category });
+    } catch {
+      Alert.alert('Erro', 'Não foi possível salvar o lançamento.');
+    }
+  }, [data]);
+  const voice = useVoiceCommand(parsed => { void saveParsedCommand(parsed, 'voz'); });
+  useEffect(() => {
+    if (!confirmation) return;
+    if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
+    confirmationTimer.current = setTimeout(() => setConfirmation(null), 6000);
+    return () => { if (confirmationTimer.current) clearTimeout(confirmationTimer.current); };
+  }, [confirmation]);
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
   const monthMovements = useMemo(() => (data?.movements ?? []).filter(m => {
     const d = new Date(m.createdAt); const now = new Date();
@@ -72,12 +103,32 @@ export default function HomeScreen() {
         </View>
         <View style={s.forecast}><Ionicons name="calendar-outline" color={C.muted} size={15}/><Text style={s.forecastLabel}>Saldo previsto no fim do mês:</Text><Text style={[s.forecastValue, { color: balanceColor }]}>{money(forecast)}</Text></View>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Abrir comando textual" onPress={() => setVisible(true)} onLongPress={() => setVisible(true)} delayLongPress={250} style={({ pressed }) => [s.logoArea, pressed && { transform: [{ scale: 1.02 }] }]}>
-        <View style={s.glow} /><View style={s.logoOuter}/><View style={s.logoInner}/>
-      </Pressable>
-      <Text style={s.voiceTitle}>Toque ou segure para falar</Text>
-      <Text style={s.voiceHint}>Comando por texto disponível nesta versão</Text>
+      <View style={s.logoArea}>
+        <VoiceOrb state={voice.state} level={voice.level}
+          onPress={() => voice.state === 'listening' ? voice.stop() : voice.start()}
+          onPressIn={() => { void voice.start(); }}
+          onPressOut={() => voice.stop()}
+        />
+      </View>
+      <Text style={s.voiceTitle}>{voice.state === 'listening' ? 'Ouvindo...' : voice.state === 'processing' ? 'Entendendo...' : voice.state === 'success' ? 'Lançamento registrado' : voice.state === 'error' ? 'Não entendi, tente de novo' : 'Toque ou segure para falar'}</Text>
+      {voice.transcript ? <Text numberOfLines={2} style={s.voiceHint}>{voice.transcript}</Text> : <Text style={s.voiceHint}>Toque para iniciar ou segure para falar</Text>}
+      {voice.error ? <Text style={s.voiceError}>{voice.error}</Text> : null}
+      {voice.state === 'error' ? <View style={s.voiceActions}>
+        {voice.error.includes('microfone') ? <Text onPress={voice.openSettings} style={s.voiceAction}>Abrir ajustes</Text> : null}
+        <Text onPress={() => { setCommand(voice.transcript); setVisible(true); voice.reset(); }} style={s.voiceAction}>Digitar</Text>
+      </View> : null}
       <Text style={s.example}>experimente: “gastei 32 no uber”</Text>
+      {confirmation ? <View style={s.confirmCard}>
+        <Text style={s.confirmText}>{confirmation.text}</Text>
+        <View style={s.confirmActions}>
+          <Text onPress={async () => {
+            const current = data ?? await loadAppData();
+            const next = { ...current, movements: current.movements.filter(item => item.id !== confirmation.id) };
+            await saveAppData(next); setData(next); setConfirmation(null);
+          }} style={s.confirmAction}>Desfazer</Text>
+          <Text onPress={() => { setConfirmation(null); router.push({ pathname: '/(tabs)/movements', params: { editId: confirmation.id } }); }} style={s.confirmAction}>Editar</Text>
+        </View>
+      </View> : null}
     </ScrollView>
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}>
       <View style={s.backdrop}><View style={s.modal}><View style={s.handle}/><Text style={s.modalTitle}>Comando Delta</Text><Text style={s.modalHint}>Digite uma entrada, gasto ou investimento.</Text>
@@ -109,6 +160,13 @@ const s = StyleSheet.create({
   logoInner: { position: 'absolute', width: 0, height: 0, borderLeftWidth: 93, borderRightWidth: 93, borderBottomWidth: 164, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: C.bg, top: 72 },
   voiceTitle: { color: C.text, textAlign: 'center', fontSize: 17, fontWeight: '600', marginTop: 1 },
   voiceHint: { color: C.muted, textAlign: 'center', fontSize: 12, marginTop: 9 },
+  voiceError: { color: '#FF8A9A', textAlign: 'center', fontSize: 12, marginTop: 8 },
+  voiceActions: { flexDirection: 'row', justifyContent: 'center', gap: 22, marginTop: 12 },
+  voiceAction: { color: C.green, fontSize: 13, fontWeight: '700', padding: 6 },
+  confirmCard: { backgroundColor: '#10231B', borderWidth: 1, borderColor: 'rgba(61,220,132,0.35)', borderRadius: 16, padding: 14, marginTop: 14 },
+  confirmText: { color: C.text, fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  confirmActions: { flexDirection: 'row', justifyContent: 'center', gap: 28, marginTop: 12 },
+  confirmAction: { color: C.green, fontSize: 13, fontWeight: '800' },
   example: { color: C.tertiary, textAlign: 'center', fontSize: 11, marginTop: 23 },
   backdrop: { flex: 1, backgroundColor: '#000D', justifyContent: 'flex-end' }, modal: { backgroundColor: C.panel, borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 21, paddingBottom: 30, borderWidth: 1, borderColor: C.border },
   handle: { width: 42, height: 4, borderRadius: 3, backgroundColor: C.border, alignSelf: 'center', marginBottom: 18 },
