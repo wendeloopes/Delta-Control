@@ -44,7 +44,7 @@ export default function MovementsScreen() {
     setVisible(true);
   }
   async function add() {
-    const value = Number(amount.replace(/\\./g, '').replace(',', '.'));
+    const value = Number(amount.replace(/\./g, '').replace(',', '.'));
     if (!description.trim() || !Number.isFinite(value) || value <= 0) { Alert.alert('Confira os dados', 'Informe descrição e valor maior que zero.'); return; }
     const parts = dateText.trim().split('/');
     if (parts.length !== 3 || parts[0].length !== 2 || parts[1].length !== 2 || parts[2].length !== 4) { Alert.alert('Data inválida', 'Use o formato DD/MM/AAAA.'); return; }
