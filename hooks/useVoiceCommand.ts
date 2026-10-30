@@ -123,6 +123,16 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
   }, []);
 
   useEffect(() => {
+    if (state !== 'success') return;
+    const timer = setTimeout(() => {
+      setState('idle');
+      setTranscript('');
+      transcriptRef.current = '';
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [state]);
+
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', next => {
       if (next !== 'active') cancel();
     });
