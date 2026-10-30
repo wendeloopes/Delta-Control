@@ -14,6 +14,8 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
   const [error, setError] = useState('');
   const [level, setLevel] = useState(0);
   const transcriptRef = useRef('');
+  const startCancelledRef = useRef(false);
+  const ignoreEndRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onCommandRef = useRef(onCommand);
   onCommandRef.current = onCommand;
@@ -51,6 +53,7 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
   });
   useSpeechRecognitionEvent('end', () => {
     clearTimeoutRef();
+    if (ignoreEndRef.current) { ignoreEndRef.current = false; return; }
     setLevel(0);
     const spoken = transcriptRef.current.trim();
     if (!spoken) {
@@ -71,11 +74,14 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
 
   const start = useCallback(async () => {
     if (state === 'listening' || state === 'processing') return true;
+    startCancelledRef.current = false;
+    ignoreEndRef.current = false;
     setError('');
     setTranscript('');
     transcriptRef.current = '';
     try {
       const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (startCancelledRef.current) return false;
       if (!permission.granted) {
         setState('error');
         setError('Permita o microfone para lançar por voz');
@@ -100,11 +106,14 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
   }, [state]);
 
   const stop = useCallback(() => {
+    startCancelledRef.current = true;
     clearTimeoutRef();
     try { ExpoSpeechRecognitionModule.stop(); } catch { /* recognition may already be closed */ }
   }, []);
 
   const cancel = useCallback(() => {
+    startCancelledRef.current = true;
+    ignoreEndRef.current = true;
     clearTimeoutRef();
     transcriptRef.current = '';
     setTranscript('');
