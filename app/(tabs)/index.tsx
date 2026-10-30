@@ -48,7 +48,7 @@ export default function HomeScreen() {
   return <Page>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 150 }}>
       <View style={s.header}>
-        <View><Text style={s.greeting}>{greeting()}</Text><Text style={s.month}>{new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</Text></View>
+        <View><Text style={s.greeting}>{greeting()}{data.profileName?.trim() ? ", " + data.profileName.trim().toLocaleUpperCase("pt-BR") : ""}</Text><Text style={s.month}>{new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</Text></View>
         <Pressable accessibilityRole="button" accessibilityLabel="Abrir comando por texto" onPress={() => setVisible(true)} style={s.keyboard}><Ionicons name="keypad-outline" color={C.text} size={23} /></Pressable>
       </View>
       <View style={s.balanceBlock}>
