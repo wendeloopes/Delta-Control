@@ -94,7 +94,7 @@ export default function HomeScreen() {
         <View style={s.forecast}><Ionicons name="calendar-outline" color={C.muted} size={15}/><Text style={s.forecastLabel}>Saldo previsto no fim do mês:</Text><Text style={[s.forecastValue, { color: balanceColor }]}>{money(forecast)}</Text></View>
       </View>
       <View style={s.logoArea}>
-        <VoiceOrb state={voice.state} level={voice.level}
+        <VoiceOrb state={voice.state} level={voice.level} bass={voice.bass} treble={voice.treble}
           onPress={() => voice.state === 'listening' ? voice.stop() : voice.start()}
           onPressIn={() => { void voice.start(); }}
           onPressOut={() => voice.stop()}
