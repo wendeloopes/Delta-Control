@@ -37,6 +37,10 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState('');
   const [level, setLevel] = useState(0);
+  const [bass, setBass] = useState(0);
+  const [treble, setTreble] = useState(0);
+  const previousLevelRef = useRef(0);
+  const bassRef = useRef(0);
   const transcriptRef = useRef('');
   const startCancelledRef = useRef(false);
   const startPendingRef = useRef(false);
@@ -77,14 +81,23 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
     const raw = Number(event.value);
     if (!Number.isFinite(raw)) return;
     const normalized = Math.max(0, Math.min(1, (raw + 2) / 12));
-    setLevel(previous => Math.abs(previous - normalized) < 0.025 ? previous : normalized);
+    // SpeechRecognition exposes a single loudness envelope, not PCM spectrum.
+    // Split it into a slow low-band envelope and fast transient/high-band proxy.
+    const low = bassRef.current * 0.78 + normalized * 0.22;
+    const transient = Math.max(0, normalized - previousLevelRef.current);
+    const high = Math.min(1, transient * 3.8 + normalized * 0.16);
+    bassRef.current = low;
+    previousLevelRef.current = normalized;
+    setBass(low);
+    setTreble(high);
+    setLevel(previous => Math.abs(previous - normalized) < 0.012 ? previous : normalized);
   });
 
   useSpeechRecognitionEvent('error', event => {
     activeRef.current = false;
     clearTimers();
     const text = messageForRecognitionError(event.error, event.message);
-    setLevel(0);
+    setLevel(0); setBass(0); setTreble(0); bassRef.current = 0; previousLevelRef.current = 0;
     if (!text) return;
     setState('error');
     setError(text);
@@ -98,7 +111,7 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
       return;
     }
     const spoken = transcriptRef.current.trim();
-    setLevel(0);
+    setLevel(0); setBass(0); setTreble(0); bassRef.current = 0; previousLevelRef.current = 0;
     if (!spoken) {
       setState(current => current === 'error' ? current : 'error');
       setError(current => current || 'O reconhecimento terminou sem transcrever fala. Confira se o serviço de voz do Android está instalado e habilitado.');
@@ -123,7 +136,7 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
     setError('');
     setTranscript('');
     transcriptRef.current = '';
-    setLevel(0);
+    setLevel(0); setBass(0); setTreble(0); bassRef.current = 0; previousLevelRef.current = 0;
 
     try {
       // Some Android permission dialogs briefly change AppState. Do not cancel
@@ -235,5 +248,5 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
     setLevel(0);
   }, [clearTimers]);
 
-  return { state, transcript, error, level, start, stop, cancel, reset, openSettings: () => Linking.openSettings() };
+  return { state, transcript, error, level, bass, treble, start, stop, cancel, reset, openSettings: () => Linking.openSettings() };
 }
