@@ -29,7 +29,7 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
     return () => subscription.remove();
   }, []);
 
-  // The ribbons react to the microphone's measured input level, not to a free-running rotation.
+  // The ribbons react only to the measured microphone level; never rotate autonomously.
   useEffect(() => {
     const target = listening ? Math.max(0, Math.min(1, level)) : 0;
     Animated.spring(voice, { toValue: target, speed: 22, bounciness: 5, useNativeDriver: true }).start();
@@ -41,9 +41,14 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
       pulse.setValue(0.25);
       return;
     }
+    if (!listening && !processing) {
+      pulse.setValue(0);
+      return;
+    }
+    const duration = processing ? 1500 : 1100;
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: listening ? 850 : processing ? 1500 : 3200, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0, duration: listening ? 850 : processing ? 1500 : 3200, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 1, duration, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration, useNativeDriver: true }),
     ]));
     loop.start();
     return () => loop.stop();
@@ -66,11 +71,19 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
 
   const waveY = voice.interpolate({ inputRange: [0, 1], outputRange: [0, -13] });
   const waveScale = voice.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1.12] });
-  const waveOpacity = voice.interpolate({ inputRange: [0, 0.08, 1], outputRange: [0.62, 0.72, 1] });
-  const haloOpacity = error || state === 'success' ? flash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.62] }) : pulse.interpolate({ inputRange: [0, 1], outputRange: [0.18, listening ? 0.55 : 0.32] });
+  const waveOpacity = voice.interpolate({ inputRange: [0, 0.08, 1], outputRange: [0.22, 0.35, 1] });
+  const haloOpacity = error || state === 'success'
+    ? flash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.62] })
+    : listening
+      ? voice.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.48] })
+      : processing
+        ? pulse.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.3] })
+        : 0.08;
   const scale = listening
     ? voice.interpolate({ inputRange: [0, 1], outputRange: [1, 1.045] })
-    : pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.012] });
+    : processing
+      ? pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.012] })
+      : 1;
 
   function pressIn() {
     held.current = false;
