@@ -8,7 +8,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:parser": "tsx __tests__/parseCommand.test.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "tsx": "^4.20.6"
   }
 }
