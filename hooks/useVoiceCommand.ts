@@ -164,14 +164,6 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
         continuous: false,
         maxAlternatives: 1,
         volumeChangeEventOptions: { enabled: true, intervalMillis: 100 },
-        androidIntentOptions: {
-          EXTRA_LANGUAGE: 'pt-BR',
-          EXTRA_LANGUAGE_PREFERENCE: 'pt-BR',
-          EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE: false,
-          EXTRA_PARTIAL_RESULTS: true,
-          EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 1800,
-          EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 1200,
-        },
         recordingOptions: { persist: false },
       });
       return true;
