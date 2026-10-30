@@ -63,7 +63,7 @@ export default function HomeScreen() {
         <View style={s.forecast}><Ionicons name="calendar-outline" color={C.muted} size={15}/><Text style={s.forecastLabel}>Saldo previsto no fim do mês:</Text><Text style={[s.forecastValue, { color: balanceColor }]}>{money(forecast)}</Text></View>
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Abrir comando textual" onPress={() => setVisible(true)} onLongPress={() => setVisible(true)} delayLongPress={250} style={({ pressed }) => [s.logoArea, pressed && { transform: [{ scale: 1.02 }] }]}>
-        <View style={s.glow} /><View style={s.logoOuter}/><View style={s.logoInner}/><View style={s.logoCore}><Ionicons name="mic-outline" color={C.text} size={34}/></View>
+        <View style={s.glow} /><View style={s.logoOuter}/><View style={s.logoInner}/>
       </Pressable>
       <Text style={s.voiceTitle}>Toque ou segure para falar</Text>
       <Text style={s.voiceHint}>Comando por texto disponível nesta versão</Text>
@@ -97,7 +97,6 @@ const s = StyleSheet.create({
   glow: { position: 'absolute', width: 245, height: 245, borderRadius: 125, backgroundColor: '#123D25', opacity: .42 },
   logoOuter: { position: 'absolute', width: 0, height: 0, borderLeftWidth: 116, borderRightWidth: 116, borderBottomWidth: 204, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#F5F7F6' },
   logoInner: { position: 'absolute', width: 0, height: 0, borderLeftWidth: 93, borderRightWidth: 93, borderBottomWidth: 164, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: C.bg, top: 72 },
-  logoCore: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#14231A', borderWidth: 1, borderColor: '#3DDC84', alignItems: 'center', justifyContent: 'center', marginTop: 50 },
   voiceTitle: { color: C.text, textAlign: 'center', fontSize: 17, fontWeight: '600', marginTop: 1 },
   voiceHint: { color: C.muted, textAlign: 'center', fontSize: 12, marginTop: 9 },
   example: { color: C.tertiary, textAlign: 'center', fontSize: 11, marginTop: 23 },
