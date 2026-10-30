@@ -64,24 +64,14 @@ export default function HomeScreen() {
   const dailyAverage = totals.expense / Math.max(1, today.getDate());
   const forecast = totals.balance - dailyAverage * remainingDays;
   async function addCommand() {
-    const parsed = parseQuickCommand(command);
-    if (!parsed) { Alert.alert('Comando não reconhecido', 'Ex.: entrada 150 venda, saída 29,90 almoço ou investi 100 reserva.'); return; }
-    try {
-      const current = data ?? await loadAppData();
-      const next = { ...current, movements: [{
-        id: Date.now().toString(),
-        type: parsed.type === 'gasto' ? 'saida' as const : parsed.type === 'ganho' ? 'entrada' as const : 'investimento' as const,
-        amount: parsed.amount,
-        description: parsed.description,
-        category: parsed.category,
-        installment: parsed.installments ? parsed.installments + 'x' : undefined,
-        createdAt: parsed.date.toISOString(),
-        paid: true,
-        source: 'texto' as const,
-      }, ...current.movements] };
-      await saveAppData(next); setData(next); setCommand(''); setVisible(false);
-      Alert.alert('Salvo', 'Registro adicionado ao dispositivo.');
-    } catch { Alert.alert('Erro', 'Não foi possível salvar.'); }
+    const parsed = parseCommand(command);
+    if (!parsed) {
+      Alert.alert('Comando não reconhecido', 'Ex.: gastei 32 no uber, recebi 1500 de salário ou investi 200 reais.');
+      return;
+    }
+    await saveParsedCommand(parsed, 'texto');
+    setCommand('');
+    setVisible(false);
   }
   if (!data) return <Page><Text style={{ color: C.muted }}>Carregando Delta Control…</Text></Page>;
   const balanceColor = totals.balance < 0 ? C.red : C.mint;
