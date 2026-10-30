@@ -16,6 +16,7 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
   const pulse = useRef(new Animated.Value(0)).current;
   const rotate = useRef(new Animated.Value(0)).current;
   const waveShift = useRef(new Animated.Value(0)).current;
+  const flash = useRef(new Animated.Value(0)).current;
   const [reduceMotion, setReduceMotion] = useState(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
@@ -58,7 +59,7 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
 
   const rotation = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const drift = waveShift.interpolate({ inputRange: [0, 1], outputRange: [-7, 7] });
-  const haloOpacity = error ? 0.58 : pulse.interpolate({ inputRange: [0, 1], outputRange: [0.22, listening ? 0.52 : 0.38] });
+  const haloOpacity = error || state === 'success' ? flash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.62] }) : pulse.interpolate({ inputRange: [0, 1], outputRange: [0.22, listening ? 0.52 : 0.38] });
   const scale = listening ? 1 + Math.min(0.06, level * 0.06) : pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.018] });
 
   function pressIn() {
@@ -85,7 +86,7 @@ export default function VoiceOrb({ state, level = 0, size = 190, onPressIn, onPr
       onPressOut={pressOut}
       style={styles.touch}
     >
-      <Animated.View style={[styles.halo, { width: size + 72, height: size + 72, borderRadius: (size + 72) / 2, opacity: haloOpacity, transform: [{ scale }] }]} />
+      <Animated.View style={[styles.halo, { backgroundColor: error ? '#FF6685' : state === 'success' ? '#35F6A0' : '#644CFF', width: size + 72, height: size + 72, borderRadius: (size + 72) / 2, opacity: haloOpacity, transform: [{ scale }] }]} />
       <Animated.View style={{ width: size, height: size, transform: [{ scale }] }}>
         <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden' }}>
           <Svg width={size} height={size} viewBox="0 0 200 200">
