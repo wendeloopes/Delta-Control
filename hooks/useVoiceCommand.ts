@@ -127,7 +127,7 @@ export function useVoiceCommand(onCommand: (command: ParsedCommand) => void) {
     startCancelledRef.current = true;
     clearTimeoutRef();
     setLevel(0);
-    try { ExpoSpeechRecognitionModule.stop(); catch { /* recognition may already be closed */ }
+    try { ExpoSpeechRecognitionModule.stop(); } catch { /* recognition may already be closed */ }
   }, []);
 
   const cancel = useCallback(() => {
