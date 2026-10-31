@@ -47,9 +47,10 @@ export default function HomeScreen() {
     confirmationTimer.current = setTimeout(() => setConfirmation(null), 6000);
     return () => { if (confirmationTimer.current) clearTimeout(confirmationTimer.current); };
   }, [confirmation]);
-  const refreshFromRemote = useCallback(async () => {
-    await syncPendingMovements();
+  const refreshFromRemote = useCallback(() => {
+    // Render local AsyncStorage immediately; remote sync is a background best-effort task.
     refresh();
+    void syncPendingMovements().then(() => refresh());
   }, [refresh]);
   // Sync is best-effort: offline or missing API configuration never blocks local data.
   useEffect(() => { void refreshFromRemote(); }, [refreshFromRemote]);
