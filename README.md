@@ -41,3 +41,6 @@ Depois, escaneie o QR code pelo Expo Go. Se necessário, execute `npx expo start
 2. Corrigir eventuais incompatibilidades de versões.
 3. Implementar testes e validação dos comandos.
 4. Planejar exportação, autenticação e backup, caso sejam necessários.
+
+## Ícone do aplicativo
+O ícone Android está configurado em `app.json` e utiliza `assets/images/icon.png`.
