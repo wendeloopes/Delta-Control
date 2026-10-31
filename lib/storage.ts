@@ -74,7 +74,7 @@ function movementFingerprint(movement: Movement | ExternalMovementInput): string
     movement.type,
     Number(movement.amount).toFixed(2),
     movement.description.trim().toLocaleLowerCase('pt-BR'),
-    new Date(movement.createdAt).toISOString(),
+    Number.isFinite(Date.parse(movement.createdAt)) ? new Date(movement.createdAt).toISOString() : String(movement.createdAt),
     (movement.category ?? '').trim().toLocaleLowerCase('pt-BR'),
     (movement.installment ?? '').trim().toLocaleLowerCase('pt-BR'),
   ].join('|');
