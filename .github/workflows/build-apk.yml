@@ -17,6 +17,9 @@ jobs:
   build:
     name: Validate and build Android APK
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_DELTA_API_URL: ${{ vars.EXPO_PUBLIC_DELTA_API_URL }}
+      EXPO_PUBLIC_DELTA_API_TOKEN: ${{ secrets.EXPO_PUBLIC_DELTA_API_TOKEN }}
     timeout-minutes: 45
     steps:
       - name: Checkout repository
