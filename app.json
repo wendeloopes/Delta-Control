@@ -27,6 +27,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.deltacontrol.app"
-    }
+    },
+    "icon": "./assets/images/icon.png"
   }
 }
