@@ -46,6 +46,9 @@ export default function HomeScreen() {
     confirmationTimer.current = setTimeout(() => setConfirmation(null), 6000);
     return () => { if (confirmationTimer.current) clearTimeout(confirmationTimer.current); };
   }, [confirmation]);
+  // Load externally synchronized movements on the first screen mount.
+  useEffect(() => { refresh(); }, [refresh]);
+  // Also refresh after returning to Home from another tab or screen.
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
   const monthMovements = useMemo(() => (data?.movements ?? []).filter(m => {
     const d = new Date(m.createdAt); const now = new Date();
