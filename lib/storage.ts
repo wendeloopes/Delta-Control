@@ -12,7 +12,7 @@ export type Movement = {
   fixed?: boolean;
   note?: string;
   category?: string;
-  source?: 'voz' | 'texto' | 'manual';
+  source?: 'voz' | 'texto' | 'manual' | 'external' | 'whatsapp';
 };
 
 export type AppData = {
