@@ -11,8 +11,11 @@ Deploy the repository root to Vercel. The functions are `POST /api/webhook` and 
 Create an Upstash Redis database. Queue contents are stored in Redis, never in serverless memory. WhatsApp message IDs are deduplicated for seven days.
 
 ## Expo build environment
-- `EXPO_PUBLIC_DELTA_API_URL`: Vercel origin, e.g. `https://your-project.vercel.app` (no `/api` suffix required).
-- `EXPO_PUBLIC_DELTA_API_TOKEN`: same value as `DELTA_SYNC_TOKEN`.
+In GitHub repository Settings → Secrets and variables → Actions, add:
+- Repository variable `EXPO_PUBLIC_DELTA_API_URL`: Vercel origin, e.g. `https://your-project.vercel.app` (no `/api` suffix required).
+- Repository secret `EXPO_PUBLIC_DELTA_API_TOKEN`: same value as `DELTA_SYNC_TOKEN`.
+
+The Android workflow passes these optional values into the Expo/Metro build. If they are absent, remote sync remains disabled and local AsyncStorage continues to work.
 
 **Security:** Expo public variables are embedded in the APK and can be extracted. This shared token is only a basic gate for a controlled prototype, not per-user authentication. Do not put Upstash credentials or the webhook secret in the app. Add user/device authentication before multi-user production use.
 
