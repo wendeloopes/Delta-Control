@@ -142,7 +142,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     }
     response.status(200).json({ received: messages.length, accepted, ignored });
   } catch (error) {
-    const detail = error instanceof Error ? error.name : 'UnknownError';
+    const detail = error instanceof Error ? error.name + ': ' + error.message : 'UnknownError';
     console.error('[whatsapp:meta-webhook] processing_failed', detail);
     response.status(503).json({ error: 'webhook_processing_unavailable' });
   }
