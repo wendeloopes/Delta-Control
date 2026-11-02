@@ -16,7 +16,9 @@ function responseRecorder() {
 }
 export async function runApiTests(): Promise<void> {
   const previousSecret = process.env.DELTA_API_SECRET;
+  const previousAllowedDevice = process.env.ALLOWED_DEVICE_ID;
   process.env.DELTA_API_SECRET = 'unit-test-secret';
+  process.env.ALLOWED_DEVICE_ID = 'device-test-1, device-test-2';
   try {
     const webhookResponse = responseRecorder();
     await webhook({ method: 'POST', headers: {}, body: { data: { message: { conversation: 'gastei 20 no mercado' }, key: { id: 'abc' } } } }, webhookResponse.response);
@@ -24,11 +26,11 @@ export async function runApiTests(): Promise<void> {
 
     const pendingResponse = responseRecorder();
     await pending({ method: 'GET', headers: {} }, pendingResponse.response);
-    assert(pendingResponse.status() === 401, 'Pending deve rejeitar requisição sem Bearer Token');
+    assert(pendingResponse.status() === 401, 'Pending deve rejeitar requisição sem x-device-id');
 
-    const legacyResponse = responseRecorder();
-    await pending({ method: 'GET', headers: { 'x-api-key': 'unit-test-secret' } }, legacyResponse.response);
-    assert(legacyResponse.status() === 401, 'Pending não deve aceitar x-api-key legado');
+    const wrongDeviceResponse = responseRecorder();
+    await pending({ method: 'GET', headers: { 'x-device-id': 'device-not-allowed' } }, wrongDeviceResponse.response);
+    assert(wrongDeviceResponse.status() === 401, 'Pending deve rejeitar device ID fora da allowlist');
 
     const previousUrl = process.env.UPSTASH_REDIS_REST_URL;
     const previousToken = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -42,6 +44,9 @@ export async function runApiTests(): Promise<void> {
       return { ok: true, json: async () => [{ result: 1 }] } as Response;
     }) as typeof fetch;
     try {
+      const pendingAccepted = responseRecorder();
+      await pending({ method: 'GET', headers: { 'X-Device-Id': 'device-test-2' } }, pendingAccepted.response);
+      assert(pendingAccepted.status() === 200, 'Pending deve aceitar device ID da allowlist sem Bearer secret');
       const accepted = responseRecorder();
       await webhook({ method: 'POST', headers: { Authorization: 'Bearer unit-test-secret' }, body: { data: { key: { id: 'msg-123', fromMe: false }, message: { conversation: 'gastei 20 no mercado' + String.fromCharCode(10, 0) } } } }, accepted.response);
       assert(accepted.status() === 200, 'Webhook autenticado deve processar texto válido');
@@ -56,5 +61,6 @@ export async function runApiTests(): Promise<void> {
     }
   } finally {
     if (previousSecret === undefined) delete process.env.DELTA_API_SECRET; else process.env.DELTA_API_SECRET = previousSecret;
+    if (previousAllowedDevice === undefined) delete process.env.ALLOWED_DEVICE_ID; else process.env.ALLOWED_DEVICE_ID = previousAllowedDevice;
   }
 }
