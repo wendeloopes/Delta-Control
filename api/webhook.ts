@@ -55,7 +55,7 @@ function safeText(value: unknown): string {
 function safeMessageId(value: unknown): string {
   if (typeof value !== 'string') return '';
   const id = value.trim();
-  return id.length <= 200 && /^[A-Za-z0-9._:@-]+$/.test(id) ? id : '';
+  return id.length <= 200 && /^[\\x21-\\x7E]+$/.test(id) ? id : '';
 }
 function extractMetaMessages(payload: unknown): Array<{ id: string; text: string; phoneNumberId: string }> {
   if (!payload || typeof payload !== 'object') return [];
