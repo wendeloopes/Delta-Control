@@ -44,6 +44,22 @@ export async function isAuthorizedDeviceToken(token: string): Promise<boolean> {
   const results = await redisPipeline([['SISMEMBER', 'delta:authorized_devices', digest]]);
   return Number(results[0]) === 1;
 }
+
+/**
+ * Atomically consumes a high-entropy, one-time admin pairing code and authorizes
+ * the device fingerprint. The consumed-code marker is permanent; rotate the
+ * Vercel DELTA_PAIRING_CODE secret before pairing another device.
+ */
+export async function authorizeDeviceTokenWithPairingCode(token: string, suppliedCode: string, configuredCode: string): Promise<boolean> {
+  if (!/^[a-f0-9]{64}$/i.test(token) || !/^[a-f0-9]{64}$/i.test(suppliedCode) || !/^[a-f0-9]{64}$/i.test(configuredCode)) return false;
+  if (!constantTimeEqual(suppliedCode.toLowerCase(), configuredCode.toLowerCase())) return false;
+  const deviceDigest = await hashDeviceToken(token);
+  const pairingDigest = await hashDeviceToken(configuredCode.toLowerCase());
+  const script = "if redis.call('SET', KEYS[1], '1', 'NX') then redis.call('SADD', KEYS[2], ARGV[1]); return 1 else return 0 end";
+  const results = await redisPipeline([['EVAL', script, '2', 'delta-control:pairing:consumed:' + pairingDigest, 'delta:authorized_devices', deviceDigest]]);
+  return Number(results[0]) === 1;
+}
+
 export async function enqueueMovement(movement: QueuedMovement, messageId: string): Promise<boolean> {
   const script = "local inserted = redis.call('SET', KEYS[1], '1', 'EX', ARGV[2], 'NX')\nif not inserted then return 0 end\nredis.call('LPUSH', KEYS[2], ARGV[1])\nreturn 1";
   const results = await redisPipeline([['EVAL', script, '2', 'delta-control:processed:' + messageId, QUEUE_KEY, JSON.stringify(movement), '604800']]);
