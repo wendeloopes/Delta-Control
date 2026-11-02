@@ -1,3 +1,4 @@
+declare const process: { env: Record<string, string | undefined> };
 import { __setStorageAdapterForTests, loadAppData, syncExternalMovements } from '../lib/storage';
 
 function assert(condition: unknown, message: string): asserts condition {
