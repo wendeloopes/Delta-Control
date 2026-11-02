@@ -1,3 +1,4 @@
+declare const process: { env: Record<string, string | undefined> };
 import { acknowledgeMovements, enqueueMovement, isAuthorized, listPendingMovements, QueuedMovement } from '../server/queue';
 
 function assert(condition: unknown, message: string): asserts condition {
