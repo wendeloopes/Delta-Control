@@ -43,7 +43,7 @@ export async function runApiTests(): Promise<void> {
     }) as typeof fetch;
     try {
       const accepted = responseRecorder();
-      await webhook({ method: 'POST', headers: { Authorization: 'Bearer unit-test-secret' }, body: { data: { key: { id: 'msg-123', fromMe: false }, message: { conversation: 'gastei 20 no mercado\\n\u0000' } } } }, accepted.response);
+      await webhook({ method: 'POST', headers: { Authorization: 'Bearer unit-test-secret' }, body: { data: { key: { id: 'msg-123', fromMe: false }, message: { conversation: 'gastei 20 no mercado' + String.fromCharCode(10, 0) } } } }, accepted.response);
       assert(accepted.status() === 200, 'Webhook autenticado deve processar texto válido');
       assert((queued as { description: string }).description === 'Mercado', 'Texto recebido deve ser sanitizado antes do parser e da fila');
       const invalidId = responseRecorder();
