@@ -29,7 +29,7 @@ export async function runApiTests():Promise<void>{
   const commands=JSON.parse(String(init?.body??'[]')) as string[][];
   return {ok:true,json:async()=>commands.map(command=>{
    if(command[0]==='SISMEMBER')return {result:command[2]===hash?1:0};
-   if(command[0]==='EVAL'){inserts++;return {result:inserts===1?1:0};}
+   if(command[0]==='EVAL'){const key=command[3]??'';if(processed.has(key))return {result:0};processed.add(key);return {result:1};}
    if(command[0]==='LRANGE')return {result:[]};
    if(command[0]==='LREM')return {result:1};
    return {result:0};
@@ -47,6 +47,13 @@ export async function runApiTests():Promise<void>{
   const accepted=recorder();await webhook(request('POST',body,{'x-hub-signature-256':validSignature}) as never,accepted.response);assert(accepted.status()===200,'Valid Meta Cloud API webhook is accepted');
   const result=accepted.value() as {received:number;accepted:number;ignored:number};assert(result.received===1&&result.accepted===1,'Meta text message is parsed and queued');
   const duplicate=recorder();await webhook(request('POST',body,{'x-hub-signature-256':validSignature}) as never,duplicate.response);const duplicateResult=duplicate.value() as {accepted:number;ignored:number};assert(duplicateResult.accepted===0&&duplicateResult.ignored===1,'Duplicate Meta message is not queued twice');
+  const echoBody={object:'whatsapp_business_account',entry:[{changes:[{field:'smb_message_echoes',value:{metadata:{phone_number_id:'123456789'},message_echoes:[{from:'123456789',to:'123456789',id:'wamid.SELF-CHAT-123=',timestamp:'1793640000',type:'text',text:{body:'gastei 15 café'}}]}}]}]};
+  const echoSignature=await signature(echoBody,'meta-app-secret-unit-test');
+  const selfChat=recorder();await webhook(request('POST',echoBody,{'x-hub-signature-256':echoSignature}) as never,selfChat.response);
+  assert(selfChat.status()===200,'Business App coexistence echo is accepted');
+  const echoResult=selfChat.value() as {received:number;accepted:number;ignored:number};
+  assert(echoResult.received===1&&echoResult.accepted===1,'Message sent from the same Business App number can be queued through smb_message_echoes');
+
  }finally{
   globalThis.fetch=oldFetch;
   for(const key of keys){const value=old[key];if(value===undefined)delete process.env[key];else process.env[key]=value;}
