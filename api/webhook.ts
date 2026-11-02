@@ -44,7 +44,9 @@ async function readRawBody(request: ApiRequest): Promise<Uint8Array> {
 async function verifyMetaSignature(rawBody: Uint8Array, signature: string, appSecret: string): Promise<boolean> {
   if (!/^sha256=[a-f0-9]{64}$/i.test(signature) || !appSecret) return false;
   const key = await globalThis.crypto.subtle.importKey('raw', new TextEncoder().encode(appSecret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const digest = new Uint8Array(await globalThis.crypto.subtle.sign('HMAC', key, rawBody));
+  const bodyBuffer = new ArrayBuffer(rawBody.byteLength);
+  new Uint8Array(bodyBuffer).set(rawBody);
+  const digest = new Uint8Array(await globalThis.crypto.subtle.sign('HMAC', key, bodyBuffer));
   const expected = 'sha256=' + Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('');
   return constantTimeEqual(signature.toLowerCase(), expected);
 }
