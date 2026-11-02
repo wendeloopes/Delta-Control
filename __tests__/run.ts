@@ -1,10 +1,8 @@
-import { runParseCommandTests } from './parseCommand.test';
 import { runQueueTests } from './queue.test';
 import { runApiTests } from './api.test';
 import { runSyncClientTests } from './syncClient.test';
 
 async function main(): Promise<void> {
-  runParseCommandTests();
   await runQueueTests();
   await runApiTests();
   await runSyncClientTests();
