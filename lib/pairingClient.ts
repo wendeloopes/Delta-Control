@@ -3,7 +3,7 @@ declare const process: { env: Record<string, string | undefined> };
 const configuredUrl = process.env.EXPO_PUBLIC_DELTA_API_URL?.trim() ?? '';
 function pairingEndpoint(): string | null {
   if (!configuredUrl) return null;
-  const base = configuredUrl.replace(/\\/+$/, '');
+  const base = configuredUrl.replace(/\/+$/, '');
   return base.endsWith('/api') ? base + '/pair' : base + '/api/pair';
 }
 /** Sends the one-time admin code only for pairing; it is never persisted or logged. */
