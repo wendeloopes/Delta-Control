@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import * as Crypto from 'expo-crypto';
 
 export type Movement = {
   id: string;
@@ -22,7 +24,7 @@ export type AppData = {
 };
 
 const STORAGE_KEY = '@delta-control:data:v1';
-const DEVICE_ID_KEY = '@delta-control:device-id:v1';
+const DEVICE_TOKEN_KEY = 'delta-control:device-token:v1';
 const emptyData: AppData = { openingBalance: 0, movements: [], profileName: '' };
 const initialData: AppData = {
   openingBalance: 1250,
@@ -35,23 +37,37 @@ const initialData: AppData = {
   ],
 };
 type StorageAdapter = Pick<typeof AsyncStorage, 'getItem' | 'setItem'>;
+type SecureStorageAdapter = Pick<typeof SecureStore, 'getItemAsync' | 'setItemAsync'>;
 let storageAdapter: StorageAdapter = AsyncStorage;
-/** A device identifier, not a secret or cryptographic credential. */
-export async function getOrCreateDeviceId(): Promise<string> {
-  const existing = await storageAdapter.getItem(DEVICE_ID_KEY);
-  if (existing && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(existing)) return existing;
-  const template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
-  const deviceId = template.replace(/[xy]/g, character => {
-    const random = Math.floor(Math.random() * 16);
-    return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
-  });
-  await storageAdapter.setItem(DEVICE_ID_KEY, deviceId);
-  return deviceId;
+let secureStorageAdapter: SecureStorageAdapter = SecureStore;
+let randomBytes = (length: number) => Crypto.getRandomBytesAsync(length);
+function toHex(bytes: Uint8Array): string {
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
-
-/** Test seam: allows deterministic in-memory AsyncStorage tests without changing app storage behavior. */
+/** 256-bit device credential stored only in Android Keystore/iOS Keychain through SecureStore. */
+export async function getOrCreateDeviceToken(): Promise<string> {
+  const existing = await secureStorageAdapter.getItemAsync(DEVICE_TOKEN_KEY);
+  if (existing && /^[0-9a-f]{64}$/i.test(existing)) return existing;
+  const token = toHex(await randomBytes(32));
+  await secureStorageAdapter.setItemAsync(DEVICE_TOKEN_KEY, token, {
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  });
+  return token;
+}
+/** Public display identifier only; never use this value for authorization. */
+export async function getOrCreateDeviceId(): Promise<string> {
+  return (await getOrCreateDeviceToken()).slice(0, 8).toUpperCase();
+}
+export async function getDevicePublicId(): Promise<string> { return getOrCreateDeviceId(); }
 export function __setStorageAdapterForTests(adapter: StorageAdapter | null): void {
   storageAdapter = adapter ?? AsyncStorage;
+}
+export function __setSecureStoreAdapterForTests(
+  adapter: SecureStorageAdapter | null,
+  random?: ((length: number) => Promise<Uint8Array>) | null,
+): void {
+  secureStorageAdapter = adapter ?? SecureStore;
+  randomBytes = random ?? ((length: number) => Crypto.getRandomBytesAsync(length));
 }
 export async function loadAppData(): Promise<AppData> {
   const raw = await storageAdapter.getItem(STORAGE_KEY);
