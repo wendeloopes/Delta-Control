@@ -55,6 +55,11 @@ export async function getOrCreateDeviceToken(): Promise<string> {
 /** Public display identifier only; never use this value for authorization. */
 export async function getOrCreateDeviceId(): Promise<string> { return (await getOrCreateDeviceToken()).slice(0, 8).toUpperCase(); }
 export async function getDevicePublicId(): Promise<string> { return getOrCreateDeviceId(); }
+/** Non-secret SHA-256 fingerprint for manually provisioning this device in Redis. */
+export async function getDeviceTokenHash(): Promise<string> {
+  const cryptoModule = require('expo-crypto');
+  return cryptoModule.digestStringAsync(cryptoModule.CryptoDigestAlgorithm.SHA256, await getOrCreateDeviceToken());
+}
 export function __setStorageAdapterForTests(adapter: StorageAdapter | null): void { storageAdapter = adapter ?? AsyncStorage; }
 export function __setSecureStoreAdapterForTests(adapter: SecureStorageAdapter | null, random?: ((length: number) => Promise<Uint8Array>) | null): void {
   secureStorageAdapter = adapter;

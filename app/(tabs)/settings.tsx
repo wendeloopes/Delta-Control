@@ -3,16 +3,18 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C, ActionButton, Card, Page } from '../../components/ui';
-import { AppData, clearDemoData, getOrCreateDeviceId, loadAppData, saveAppData } from '../../lib/storage';
+import { AppData, clearDemoData, getDeviceTokenHash, getOrCreateDeviceId, loadAppData, saveAppData } from '../../lib/storage';
 
 export default function SettingsScreen() {
   const [data, setData] = useState<AppData | null>(null);
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [deviceId, setDeviceId] = useState('');
+  const [deviceHash, setDeviceHash] = useState('');
 
   const refresh = useCallback(() => {
     void getOrCreateDeviceId().then(setDeviceId);
+    void getDeviceTokenHash().then(setDeviceHash);
     loadAppData().then((value) => {
       setData(value);
       setName(value.profileName ?? '');
@@ -68,7 +70,7 @@ export default function SettingsScreen() {
       <Card><View style={s.row}><View style={s.icon}><Ionicons name="moon" size={20} color={C.green}/></View><View style={{ flex: 1 }}><Text style={s.heading}>Tema escuro</Text><Text style={s.caption}>Interface Delta em grafite e verde neon.</Text></View><Text style={s.on}>ATIVO</Text></View></Card>
       <Text style={s.section}>APLICATIVO</Text>
       <Card><View style={s.row}><View style={s.icon}><Ionicons name="phone-portrait" size={20} color={C.blue}/></View><View style={{ flex: 1 }}><Text style={s.heading}>Armazenamento local</Text><Text style={s.caption}>Seus registros ficam neste dispositivo via AsyncStorage. O token de sincronização fica no SecureStore.</Text></View></View></Card>
-      <Card><View style={s.row}><View style={s.icon}><Ionicons name="finger-print" size={20} color={C.green}/></View><View style={{ flex: 1 }}><Text style={s.heading}>Identificador deste dispositivo</Text><Text selectable style={s.caption}>{deviceId || 'Gerando identificador…'}</Text><Text style={s.caption}>Identificador público. A credencial secreta fica protegida no armazenamento seguro do dispositivo.</Text></View></View></Card>
+      <Card><View style={s.row}><View style={s.icon}><Ionicons name="finger-print" size={20} color={C.green}/></View><View style={{ flex: 1 }}><Text style={s.heading}>Identificador deste dispositivo</Text><Text selectable style={s.caption}>{deviceId || 'Gerando identificador…'}</Text><Text style={s.caption}>Identificador público. A credencial secreta fica protegida no armazenamento seguro do dispositivo.</Text><Text style={[s.caption,{marginTop:8}]}>Hash SHA-256 para cadastrar no Redis (não é o token):</Text><Text selectable style={s.caption}>{deviceHash || 'Calculando hash…'}</Text></View></View></Card>
       <Card><View style={s.row}><View style={s.icon}><Ionicons name="shield-checkmark" size={20} color={C.green}/></View><View style={{ flex: 1 }}><Text style={s.heading}>Delta Control</Text><Text style={s.caption}>Versão MVP 1.0.0 · dados sem sincronização em nuvem.</Text></View></View></Card>
       <Text style={s.section}>GERENCIAR DADOS</Text>
       <Text style={s.caption}>Remova somente os lançamentos demonstrativos. Os registros pessoais não serão apagados.</Text>
