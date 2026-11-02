@@ -32,6 +32,18 @@ export function isAuthorized(request: { headers: Record<string, string | string[
   const match = authorization.trim().match(/^Bearer\s+([^\s]+)$/i);
   return !!match && constantTimeEqual(match[1], expected);
 }
+/** SHA-256 digest used as the Redis membership key; raw tokens are never stored server-side. */
+export async function hashDeviceToken(token: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+/** Unknown or revoked tokens fail closed. Redis errors propagate and are handled as 503. */
+export async function isAuthorizedDeviceToken(token: string): Promise<boolean> {
+  if (!token || token.length < 32 || token.length > 256) return false;
+  const digest = await hashDeviceToken(token);
+  const results = await redisPipeline([['SISMEMBER', 'delta:authorized_devices', digest]]);
+  return Number(results[0]) === 1;
+}
 export async function enqueueMovement(movement: QueuedMovement, messageId: string): Promise<boolean> {
   const script = "local inserted = redis.call('SET', KEYS[1], '1', 'EX', ARGV[2], 'NX')\nif not inserted then return 0 end\nredis.call('LPUSH', KEYS[2], ARGV[1])\nreturn 1";
   const results = await redisPipeline([['EVAL', script, '2', 'delta-control:processed:' + messageId, QUEUE_KEY, JSON.stringify(movement), '604800']]);
