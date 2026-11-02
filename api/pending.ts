@@ -1,25 +1,22 @@
-import { acknowledgeMovements, listPendingMovements } from '../server/queue';
-declare const process: { env: Record<string, string | undefined> };
+import { acknowledgeMovements, isAuthorizedDeviceToken, listPendingMovements } from '../server/queue';
 declare const console: { error(...args: unknown[]): void };
 type ApiRequest = { method?: string; headers: Record<string, string | string[] | undefined>; query?: Record<string, string | string[] | undefined> };
 type ApiResponse = { status(code: number): ApiResponse; json(value: unknown): void };
-
-function isAllowedDevice(request: ApiRequest, configured?: string): boolean {
-  if (!configured) return false;
-  const entry = Object.entries(request.headers ?? {}).find(([name]) => name.toLowerCase() === 'x-device-id')?.[1];
-  const deviceId = Array.isArray(entry) ? entry[0] : entry;
-  if (typeof deviceId !== 'string' || !deviceId.trim()) return false;
-  const allowed = configured.split(',').map(value => value.trim()).filter(Boolean);
-  return allowed.some(value => value === deviceId.trim());
+function bearerToken(request: ApiRequest): string | null {
+  const entry = Object.entries(request.headers ?? {}).find(([name]) => name.toLowerCase() === 'authorization')?.[1];
+  const value = Array.isArray(entry) ? entry[0] : entry;
+  if (typeof value !== 'string') return null;
+  const match = value.trim().match(/^Bearer\s+([A-Za-z0-9_-]{32,256})$/i);
+  return match?.[1] ?? null;
 }
-
 export default async function handler(request: ApiRequest, response: ApiResponse): Promise<void> {
   if (request.method !== 'GET') { response.status(405).json({ error: 'method_not_allowed' }); return; }
-  if (!isAllowedDevice(request, process.env.ALLOWED_DEVICE_ID)) { response.status(401).json({ error: 'unauthorized' }); return; }
+  const token = bearerToken(request);
+  if (!token) { response.status(401).json({ error: 'unauthorized' }); return; }
   try {
+    if (!(await isAuthorizedDeviceToken(token))) { response.status(401).json({ error: 'unauthorized' }); return; }
     const raw = request.query?.ack, value = Array.isArray(raw) ? raw[0] : raw;
     const ids = typeof value === 'string' ? value.split(',').map(v => v.trim()).filter(v => /^[A-Za-z0-9._:@-]{1,200}$/.test(v)).slice(0, 100) : [];
-    // Acknowledge only IDs explicitly returned by the client after local persistence.
     const acknowledged = await acknowledgeMovements(ids);
     const movements = await listPendingMovements();
     response.status(200).json({ movements, acknowledged });

@@ -1,4 +1,4 @@
-import { getOrCreateDeviceId, Movement, syncExternalMovements } from './storage';
+import { getOrCreateDeviceToken, Movement, syncExternalMovements } from './storage';
 declare const process: { env: Record<string, string | undefined> };
 const configuredUrl = process.env.EXPO_PUBLIC_DELTA_API_URL?.trim() ?? '';
 function pendingEndpoint(): string | null {
@@ -21,8 +21,8 @@ async function performSync(): Promise<number> {
   const endpoint = pendingEndpoint();
   if (!endpoint) return 0;
   try {
-    const deviceId = await getOrCreateDeviceId();
-    const headers = { 'x-device-id': deviceId, Accept: 'application/json' };
+    const deviceToken = await getOrCreateDeviceToken();
+    const headers = { Authorization: 'Bearer ' + deviceToken, Accept: 'application/json' };
     const response = await fetch(endpoint, { method: 'GET', headers });
     if (!response.ok) return 0;
     const payload = await response.json() as { movements?: unknown };
