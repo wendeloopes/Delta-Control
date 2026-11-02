@@ -1,8 +1,6 @@
-import { Movement, syncExternalMovements } from './storage';
+import { getOrCreateDeviceId, Movement, syncExternalMovements } from './storage';
 declare const process: { env: Record<string, string | undefined> };
 const configuredUrl = process.env.EXPO_PUBLIC_DELTA_API_URL?.trim() ?? '';
-// This value is a client-side credential, not a server secret. Configure a restricted sync token only.
-const configuredToken = process.env.EXPO_PUBLIC_DELTA_API_TOKEN?.trim() ?? '';
 function pendingEndpoint(): string | null {
   if (!configuredUrl) return null;
   const base = configuredUrl.replace(/\/+$/, '');
@@ -21,9 +19,10 @@ export function syncPendingMovements(): Promise<number> {
 }
 async function performSync(): Promise<number> {
   const endpoint = pendingEndpoint();
-  if (!endpoint || !configuredToken) return 0;
+  if (!endpoint) return 0;
   try {
-    const headers = { Authorization: 'Bearer ' + configuredToken, Accept: 'application/json' };
+    const deviceId = await getOrCreateDeviceId();
+    const headers = { 'x-device-id': deviceId, Accept: 'application/json' };
     const response = await fetch(endpoint, { method: 'GET', headers });
     if (!response.ok) return 0;
     const payload = await response.json() as { movements?: unknown };
