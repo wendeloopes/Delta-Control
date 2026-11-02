@@ -24,7 +24,7 @@ export async function runApiTests():Promise<void>{
  process.env.WHATSAPP_PHONE_NUMBER_ID='123456789';
  process.env.KV_REST_API_URL='https://redis.example.test';
  process.env.KV_REST_API_TOKEN='redis-test-token';
- let inserts=0;
+ const processed=new Set<string>();
  globalThis.fetch=(async(_input:RequestInfo|URL,init?:RequestInit)=>{
   const commands=JSON.parse(String(init?.body??'[]')) as string[][];
   return {ok:true,json:async()=>commands.map(command=>{
