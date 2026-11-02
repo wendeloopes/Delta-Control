@@ -6,7 +6,7 @@ function bearerToken(request: ApiRequest): string | null {
   const entry = Object.entries(request.headers ?? {}).find(([name]) => name.toLowerCase() === 'authorization')?.[1];
   const value = Array.isArray(entry) ? entry[0] : entry;
   if (typeof value !== 'string') return null;
-  const match = value.trim().match(/^Bearer\\s+([A-Za-z0-9_-]{32,256})$/i);
+  const match = value.trim().match(/^Bearer\s+([A-Za-z0-9_-]{32,256})$/i);
   return match?.[1] ?? null;
 }
 export default async function handler(request: ApiRequest, response: ApiResponse): Promise<void> {
