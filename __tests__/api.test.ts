@@ -1,0 +1,40 @@
+import webhook from '../api/webhook';
+import pending from '../api/pending';
+import pair from '../api/pair';
+import { hashDeviceToken } from '../server/queue';
+declare const process: { env: Record<string,string|undefined> };
+function assert(value:unknown,message:string):asserts value{if(!value)throw new Error(message);}
+function recorder(){let code=200;let value:unknown;let sent='';const response={status(n:number){code=n;return response;},json(v:unknown){value=v;},send(v:string){sent=v;}};return {response,status:()=>code,value:()=>value,sent:()=>sent};}
+function request(method:string,body:unknown,headers:Record<string,string>={},query?:Record<string,string>){const bytes=new TextEncoder().encode(JSON.stringify(body));return {method,headers,query,async *[Symbol.asyncIterator](){yield bytes;}};}
+async function signature(body:unknown,secret:string):Promise<string>{const bytes=new TextEncoder().encode(JSON.stringify(body));const key=await globalThis.crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);const digest=new Uint8Array(await globalThis.crypto.subtle.sign('HMAC',key,bytes));return 'sha256='+Array.from(digest,b=>b.toString(16).padStart(2,'0')).join('');}
+export async function runApiTests():Promise<void>{
+ const keys=['DELTA_API_SECRET','DELTA_PAIRING_CODE','META_APP_SECRET','WHATSAPP_VERIFY_TOKEN','WHATSAPP_PHONE_NUMBER_ID','UPSTASH_REDIS_REST_URL','UPSTASH_REDIS_REST_TOKEN','KV_REST_API_URL','KV_REST_API_TOKEN'];
+ const old=Object.fromEntries(keys.map(key=>[key,process.env[key]]));const oldFetch=globalThis.fetch;
+ const valid='device-token-for-api-test-0123456789abcdef',hash=await hashDeviceToken(valid);
+ process.env.DELTA_PAIRING_CODE='b'.repeat(64);process.env.META_APP_SECRET='meta-app-secret-unit-test';process.env.WHATSAPP_VERIFY_TOKEN='verify-token-unit-test';process.env.WHATSAPP_PHONE_NUMBER_ID='123456789';process.env.KV_REST_API_URL='https://redis.example.test';process.env.KV_REST_API_TOKEN='redis-test-token';
+ let pairingConsumed=false;const processed=new Set<string>();
+ globalThis.fetch=(async(_input:RequestInfo|URL,init?:RequestInit)=>{const commands=JSON.parse(String(init?.body??'[]')) as string[][];return {ok:true,json:async()=>commands.map(c=>{if(c[0]==='SISMEMBER')return {result:c[2]===hash?1:0};if(c[0]==='LRANGE')return {result:[]};if(c[0]==='EVAL'&&String(c[3]).includes('pairing:consumed')){if(pairingConsumed)return {result:0};pairingConsumed=true;return {result:1};}if(c[0]==='EVAL'){const key=c[3]??'';if(processed.has(key))return {result:0};processed.add(key);return {result:1};}if(c[0]==='LREM')return {result:1};return {result:1};})} as Response;}) as typeof fetch;
+ try{
+  const missing=recorder();await pending({method:'GET',headers:{}},missing.response);assert(missing.status()===401,'Missing device token returns 401');
+  const legacy=recorder();await pending({method:'GET',headers:{'x-device-id':'public-id'}},legacy.response);assert(legacy.status()===401,'Public ID cannot authenticate');
+  const invalid=recorder();await pending({method:'GET',headers:{Authorization:'Bearer device-token-invalid-0123456789abcdef'}},invalid.response);assert(invalid.status()===401,'Invalid or revoked token returns 401');
+  const accepted=recorder();await pending({method:'GET',headers:{Authorization:'Bearer '+valid}},accepted.response);assert(accepted.status()===200,'Authorized SHA-256 member is accepted');
+  const pairingToken='a'.repeat(64),pairingCode='b'.repeat(64);
+  const pairWrong=recorder();await pair({method:'POST',body:{token:pairingToken,code:'c'.repeat(64)}},pairWrong.response);assert(pairWrong.status()===409,'Incorrect one-time pairing code is rejected');
+  const pairGood=recorder();await pair({method:'POST',body:{token:pairingToken,code:pairingCode}},pairGood.response);assert(pairGood.status()===200,'Valid one-time code authorizes device');
+  const pairReplay=recorder();await pair({method:'POST',body:{token:pairingToken,code:pairingCode}},pairReplay.response);assert(pairReplay.status()===409,'Consumed pairing code cannot be reused');
+  const pairBadShape=recorder();await pair({method:'POST',body:{token:'short',code:pairingCode}},pairBadShape.response);assert(pairBadShape.status()===400,'Malformed pairing request is rejected');
+  const verify=recorder();await webhook({method:'GET',headers:{},query:{'hub.mode':'subscribe','hub.verify_token':'verify-token-unit-test','hub.challenge':'challenge-123'}},verify.response);assert(verify.status()===200&&verify.sent()==='challenge-123','Meta GET verification returns challenge');
+  const denied=recorder();await webhook({method:'GET',headers:{},query:{'hub.mode':'subscribe','hub.verify_token':'wrong','hub.challenge':'challenge-123'}},denied.response);assert(denied.status()===403,'Wrong Meta verification token is rejected');
+  const inbound={object:'whatsapp_business_account',entry:[{changes:[{field:'messages',value:{metadata:{phone_number_id:'123456789'},messages:[{from:'5511999999999',id:'wamid.HBgABC+/=',timestamp:'1793640000',type:'text',text:{body:'gastei 20 no mercado'}}]}}]}]};
+  const badSignature=recorder();await webhook(request('POST',inbound,{'x-hub-signature-256':'sha256='+'0'.repeat(64)}) as never,badSignature.response);assert(badSignature.status()===401,'Invalid Meta signature is rejected');
+  const inboundSignature=await signature(inbound,'meta-app-secret-unit-test');
+  const inboundAccepted=recorder();await webhook(request('POST',inbound,{'x-hub-signature-256':inboundSignature}) as never,inboundAccepted.response);assert(inboundAccepted.status()===200,'Meta Cloud API incoming webhook is accepted');
+  const inboundResult=inboundAccepted.value() as {received:number;accepted:number};assert(inboundResult.received===1&&inboundResult.accepted===1,'Incoming Meta text is parsed and queued');
+  const echo={object:'whatsapp_business_account',entry:[{changes:[{field:'smb_message_echoes',value:{metadata:{phone_number_id:'123456789'},message_echoes:[{from:'123456789',to:'123456789',id:'wamid.SELF-CHAT-123=',timestamp:'1793640000',type:'text',text:{body:'gastei 15 café'}}]}}]}]};
+  const echoSignature=await signature(echo,'meta-app-secret-unit-test');
+  const selfChat=recorder();await webhook(request('POST',echo,{'x-hub-signature-256':echoSignature}) as never,selfChat.response);assert(selfChat.status()===200,'Business App coexistence echo is accepted');
+  const echoResult=selfChat.value() as {received:number;accepted:number};assert(echoResult.received===1&&echoResult.accepted===1,'Same-number Business App echo is queued');
+  const duplicate=recorder();await webhook(request('POST',inbound,{'x-hub-signature-256':inboundSignature}) as never,duplicate.response);const duplicateResult=duplicate.value() as {accepted:number;ignored:number};assert(duplicateResult.accepted===0&&duplicateResult.ignored===1,'Duplicate Meta message is not queued twice');
+ }finally{globalThis.fetch=oldFetch;for(const key of keys){const value=old[key];if(value===undefined)delete process.env[key];else process.env[key]=value;}}
+}

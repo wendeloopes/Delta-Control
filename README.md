@@ -22,6 +22,31 @@ npx expo start
 ```
 Depois, escaneie o QR code pelo Expo Go. Se necessário, execute `npx expo start --tunnel`.
 
+## Build Android de Preview
+
+O workflow `.github/workflows/build-apk.yml` compila um APK de teste para a branch `feat/device-pairing-flow` e disponibiliza o arquivo como artifact do GitHub Actions. Esse APK usa somente a API Preview do pareamento; não altera nem publica a configuração de produção.
+
+## Pareamento seguro de dispositivos (Fase D)
+
+O endpoint `POST /api/pair` autoriza um dispositivo usando um código administrativo de uso único. O token de 256 bits permanece no SecureStore do aparelho; somente o SHA-256 é salvo no conjunto `delta:authorized_devices` do Upstash Redis.
+
+### Configuração de Preview
+
+1. No projeto Vercel, configure `DELTA_PAIRING_CODE` como variável **Sensitive/Secret** no ambiente Preview. Use um valor aleatório de 64 caracteres hexadecimais (32 bytes). Não use o token do webhook, não coloque o valor no código e não o envie em logs.
+2. Confirme que `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` estão configurados no mesmo ambiente Preview.
+3. No ambiente em que o app Expo for compilado, configure `EXPO_PUBLIC_DELTA_API_URL` com a URL base do deployment Preview do backend (por exemplo, a URL `*.vercel.app`, sem `/api` no final).
+4. Recompile o app para que a variável pública de URL seja incorporada ao bundle.
+5. No app, abra **Perfil → Sincronização segura**, cole o código administrativo e toque em **Parear dispositivo**.
+
+### Regras do código
+
+- O código deve ter 64 caracteres hexadecimais e é enviado apenas durante o pareamento.
+- O backend consome o código atomicamente no Redis e grava apenas seu hash como marcador; o código não pode ser reutilizado.
+- Para autorizar outro aparelho, gere um código novo, substitua `DELTA_PAIRING_CODE` no Vercel Preview e aguarde o novo deployment antes de parear.
+- Não configure o segredo em `EXPO_PUBLIC_*`, não o inclua em arquivos versionados e não o reutilize como segredo do webhook.
+- O endpoint falha fechado se o segredo ou o Redis não estiverem configurados.
+- O PR continua isolado; este trabalho não habilita produção nem altera `main`.
+
 ## Exemplos de comandos
 - `entrada 150 venda`
 - `recebi 250 salário`
@@ -44,3 +69,18 @@ Depois, escaneie o QR code pelo Expo Go. Se necessário, execute `npx expo start
 
 ## Ícone do aplicativo
 O ícone Android está configurado em `app.json` e utiliza `assets/images/icon.png`.
+
+## WhatsApp Cloud API (Meta)
+
+The webhook endpoint is `POST /api/webhook` and also handles Meta's GET subscription challenge. Configure the Meta App webhook callback URL to the deployed Vercel URL plus `/api/webhook`, and subscribe the WhatsApp Business Account to `messages`. For a number onboarded through WhatsApp Business App Coexistence, also subscribe to `smb_message_echoes`; this event mirrors messages sent from the WhatsApp Business App into the webhook, allowing the owner to send commands from the same connected number without a second phone number.
+
+Required server-side Vercel environment variables (Preview first):
+
+- `META_APP_SECRET`: Meta App Secret, used only to validate `X-Hub-Signature-256`.
+- `WHATSAPP_VERIFY_TOKEN`: private random string configured identically in Meta's webhook verification screen and Vercel.
+- `KV_REST_API_URL` and `KV_REST_API_TOKEN` (or the corresponding `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`) for the Redis queue.
+- `WHATSAPP_PHONE_NUMBER_ID` (recommended): the connected Meta phone-number ID used to reject events for other numbers.
+
+Do not put Meta App Secret, verify token, or Redis credentials in the mobile app or any `EXPO_PUBLIC_*` variable. The webhook verifies the raw request body with HMAC-SHA256 before parsing messages and deduplicates message IDs. The app receives queued movements through the authenticated device-sync endpoint.
+
+**Same-number requirement:** receiving a message sent from the connected WhatsApp Business App requires the number to be onboarded in Meta's Coexistence mode (Business App + Cloud API) and the `smb_message_echoes` webhook field to be enabled. A number connected in API-only mode cannot produce app-originated echo events. No second phone number is needed when Coexistence is active; the app can send a command from its existing Business App chat, including a self-chat if WhatsApp delivers that message as an echo.
