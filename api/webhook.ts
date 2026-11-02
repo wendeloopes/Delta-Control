@@ -72,8 +72,10 @@ function extractMetaMessages(payload: unknown): Array<{ id: string; text: string
       const value = change.value && typeof change.value === 'object' ? change.value as Record<string, unknown> : {};
       const metadata = value.metadata && typeof value.metadata === 'object' ? value.metadata as Record<string, unknown> : {};
       const phoneNumberId = typeof metadata.phone_number_id === 'string' ? metadata.phone_number_id : '';
-      if (!Array.isArray(value.messages)) continue;
-      for (const messageValue of value.messages) {
+      const field = change.field;
+      const eventMessages = field === 'smb_message_echoes' ? value.message_echoes : value.messages;
+      if (!Array.isArray(eventMessages)) continue;
+      for (const messageValue of eventMessages) {
         if (!messageValue || typeof messageValue !== 'object') continue;
         const message = messageValue as Record<string, unknown>;
         const type = message.type;
