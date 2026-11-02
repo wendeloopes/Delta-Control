@@ -22,6 +22,7 @@ export type AppData = {
 };
 
 const STORAGE_KEY = '@delta-control:data:v1';
+const DEVICE_ID_KEY = '@delta-control:device-id:v1';
 const emptyData: AppData = { openingBalance: 0, movements: [], profileName: '' };
 const initialData: AppData = {
   openingBalance: 1250,
@@ -35,6 +36,19 @@ const initialData: AppData = {
 };
 type StorageAdapter = Pick<typeof AsyncStorage, 'getItem' | 'setItem'>;
 let storageAdapter: StorageAdapter = AsyncStorage;
+/** A device identifier, not a secret or cryptographic credential. */
+export async function getOrCreateDeviceId(): Promise<string> {
+  const existing = await storageAdapter.getItem(DEVICE_ID_KEY);
+  if (existing && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(existing)) return existing;
+  const template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
+  const deviceId = template.replace(/[xy]/g, character => {
+    const random = Math.floor(Math.random() * 16);
+    return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
+  });
+  await storageAdapter.setItem(DEVICE_ID_KEY, deviceId);
+  return deviceId;
+}
+
 /** Test seam: allows deterministic in-memory AsyncStorage tests without changing app storage behavior. */
 export function __setStorageAdapterForTests(adapter: StorageAdapter | null): void {
   storageAdapter = adapter ?? AsyncStorage;
