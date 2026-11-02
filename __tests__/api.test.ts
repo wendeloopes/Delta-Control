@@ -40,7 +40,8 @@ export async function runApiTests(): Promise<void> {
     let queued: unknown;
     globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
       const commands = JSON.parse(String(init?.body ?? '[]')) as string[][];
-      queued = JSON.parse(commands[0][5]);
+      if (commands[0]?.[0] === 'EVAL') queued = JSON.parse(commands[0][5]);
+      if (commands[0]?.[0] === 'LRANGE') return { ok: true, json: async () => [{ result: [] }] } as Response;
       return { ok: true, json: async () => [{ result: 1 }] } as Response;
     }) as typeof fetch;
     try {
