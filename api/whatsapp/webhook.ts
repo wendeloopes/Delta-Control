@@ -136,7 +136,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       return;
     }
 
-    const allowedNumber = (process.env.WHATSAPP_ALLOWED_NUMBER ?? '').replace(/\\D/g, '');
+    const allowedNumber = (process.env.WHATSAPP_ALLOWED_NUMBER ?? '').replace(/\D/g, '');
     if (!allowedNumber) {
       response.status(503).json({ error: 'allowed_number_not_configured' });
       return;
@@ -149,7 +149,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 
       const parsed = parseCommand(incoming.text);
       if (!parsed) {
-        await sendText(incoming.from, 'Não consegui identificar esse lançamento. Exemplos:\\n• Gastei 35 reais no almoço\\n• Recebi 2500 de salário\\n• Investi 100 reais em renda fixa');
+        await sendText(incoming.from, 'Não consegui identificar esse lançamento. Exemplos:\n• Gastei 35 reais no almoço\n• Recebi 2500 de salário\n• Investi 100 reais em renda fixa');
         continue;
       }
 
@@ -169,7 +169,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       const inserted = await enqueueMovement(movement, incoming.id);
       const kind = parsed.type === 'gasto' ? 'Despesa' : parsed.type === 'ganho' ? 'Entrada' : 'Investimento';
       const status = inserted ? 'recebido e enviado ao Delta Control' : 'já havia sido recebido anteriormente';
-      await sendText(incoming.from, `✅ ${kind} ${status}.\\n\\n${parsed.description}: ${money(parsed.amount)}\\nCategoria: ${parsed.category}`);
+      await sendText(incoming.from, `✅ ${kind} ${status}.\n\n${parsed.description}: ${money(parsed.amount)}\nCategoria: ${parsed.category}`);
     }
 
     response.status(200).json({ received: true });
