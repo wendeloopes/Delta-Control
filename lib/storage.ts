@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
-import * as Crypto from 'expo-crypto';
+declare const require: (moduleName: string) => any;
 
 export type Movement = {
   id: string;
@@ -37,17 +36,20 @@ const initialData: AppData = {
   ],
 };
 type StorageAdapter = Pick<typeof AsyncStorage, 'getItem' | 'setItem'>;
-type SecureStorageAdapter = Pick<typeof SecureStore, 'getItemAsync' | 'setItemAsync'>;
+type SecureStorageAdapter = Pick<typeof import('expo-secure-store'), 'getItemAsync' | 'setItemAsync'>;
 let storageAdapter: StorageAdapter = AsyncStorage;
-let secureStorageAdapter: SecureStorageAdapter = SecureStore;
-let randomBytes = (length: number) => Crypto.getRandomBytesAsync(length);
+let secureStorageAdapter: SecureStorageAdapter | null = null;
+let testRandomBytes: ((length: number) => Promise<Uint8Array>) | null = null;
+function secureStore(): SecureStorageAdapter { return secureStorageAdapter ?? require('expo-secure-store') as SecureStorageAdapter; }
+function secureRandomBytes(length: number): Promise<Uint8Array> { return testRandomBytes ? testRandomBytes(length) : require('expo-crypto').getRandomBytesAsync(length) as Promise<Uint8Array>; }
 function toHex(bytes: Uint8Array): string { return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join(''); }
 /** 256-bit device credential stored only in Android Keystore/iOS Keychain through SecureStore. */
 export async function getOrCreateDeviceToken(): Promise<string> {
-  const existing = await secureStorageAdapter.getItemAsync(DEVICE_TOKEN_KEY);
+  const store = secureStore();
+  const existing = await store.getItemAsync(DEVICE_TOKEN_KEY);
   if (existing && /^[0-9a-f]{64}$/i.test(existing)) return existing;
-  const token = toHex(await randomBytes(32));
-  await secureStorageAdapter.setItemAsync(DEVICE_TOKEN_KEY, token, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
+  const token = toHex(await secureRandomBytes(32));
+  await store.setItemAsync(DEVICE_TOKEN_KEY, token);
   return token;
 }
 /** Public display identifier only; never use this value for authorization. */
@@ -55,8 +57,8 @@ export async function getOrCreateDeviceId(): Promise<string> { return (await get
 export async function getDevicePublicId(): Promise<string> { return getOrCreateDeviceId(); }
 export function __setStorageAdapterForTests(adapter: StorageAdapter | null): void { storageAdapter = adapter ?? AsyncStorage; }
 export function __setSecureStoreAdapterForTests(adapter: SecureStorageAdapter | null, random?: ((length: number) => Promise<Uint8Array>) | null): void {
-  secureStorageAdapter = adapter ?? SecureStore;
-  randomBytes = random ?? ((length: number) => Crypto.getRandomBytesAsync(length));
+  secureStorageAdapter = adapter;
+  testRandomBytes = random ?? null;
 }
 export async function loadAppData(): Promise<AppData> {
   const raw = await storageAdapter.getItem(STORAGE_KEY);
