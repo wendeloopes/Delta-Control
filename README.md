@@ -22,6 +22,9 @@ npx expo start
 ```
 Depois, escaneie o QR code pelo Expo Go. Se necessário, execute `npx expo start --tunnel`.
 
+## Build Android de Preview
+
+O workflow `.github/workflows/build-apk.yml` compila um APK de teste para a branch `feat/device-pairing-flow` e disponibiliza o arquivo como artifact do GitHub Actions. Esse APK usa somente a API Preview do pareamento; não altera nem publica a configuração de produção.
 
 ## Pareamento seguro de dispositivos (Fase D)
 
