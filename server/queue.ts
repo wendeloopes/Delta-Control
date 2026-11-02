@@ -2,8 +2,8 @@ declare const process: { env: Record<string, string | undefined> };
 export type QueuedMovement = { id: string; type: 'entrada' | 'saida' | 'investimento'; amount: number; description: string; category: string; createdAt: string; installment?: string; paid: boolean; demo: false; source: 'whatsapp' };
 const QUEUE_KEY = 'delta-control:pending-movements';
 function redisConfig() {
-  const url = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/+$/, '');
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = (process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL)?.replace(/\/+$/, '');
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
   if (!url || !token) throw new Error('Redis não configurado.');
   return { url, token };
 }
