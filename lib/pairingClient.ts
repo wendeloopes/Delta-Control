@@ -9,7 +9,8 @@ function pairingEndpoint(): string | null {
 /** Sends the one-time admin code only for pairing; it is never persisted or logged. */
 export async function pairCurrentDevice(code: string): Promise<'paired' | 'invalid' | 'unavailable'> {
   const endpoint = pairingEndpoint();
-  if (!endpoint || !/^[a-f0-9]{64}$/i.test(code.trim())) return 'invalid';
+  if (!endpoint) return 'unavailable';
+  if (!/^[a-f0-9]{64}$/i.test(code.trim())) return 'invalid';
   try {
     const token = await getOrCreateDeviceToken();
     const response = await fetch(endpoint, {
