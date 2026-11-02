@@ -15,16 +15,25 @@ async function redisPipeline(commands: string[][]): Promise<unknown[]> {
   if (payload.some(item => item.error)) throw new Error('Falha em operação Redis.');
   return payload.map(item => item.result);
 }
+function constantTimeEqual(left: string, right: string): boolean {
+  let mismatch = left.length ^ right.length;
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    mismatch |= (left.charCodeAt(index % Math.max(left.length, 1)) || 0) ^ (right.charCodeAt(index % Math.max(right.length, 1)) || 0);
+  }
+  return mismatch === 0;
+}
+/** Only the configured Bearer secret is accepted; legacy x-api-key headers are intentionally rejected. */
 export function isAuthorized(request: { headers: Record<string, string | string[] | undefined> }, expected?: string): boolean {
   if (!expected) return false;
-  const raw = request.headers['x-api-key'];
-  const key = Array.isArray(raw) ? raw[0] : raw;
-  const auth = request.headers.authorization;
-  const bearer = typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  return key === expected || bearer === expected;
+  const authorizationEntry = Object.entries(request.headers ?? {}).find(([name]) => name.toLowerCase() === 'authorization')?.[1];
+  const authorization = Array.isArray(authorizationEntry) ? authorizationEntry[0] : authorizationEntry;
+  if (typeof authorization !== 'string') return false;
+  const match = authorization.trim().match(/^Bearer\s+([^\s]+)$/i);
+  return !!match && constantTimeEqual(match[1], expected);
 }
 export async function enqueueMovement(movement: QueuedMovement, messageId: string): Promise<boolean> {
-  const script = "local inserted = redis.call('SET', KEYS[1], '1', 'EX', ARGV[2], 'NX')\nif not inserted then return 0 end\nredis.call('LPUSH', KEYS[2], ARGV[1])\nreturn 1";
+  const script = "local inserted = redis.call('SET', KEYS[1], '1', 'EX', ARGV[2], 'NX')\\nif not inserted then return 0 end\\nredis.call('LPUSH', KEYS[2], ARGV[1])\\nreturn 1";
   const results = await redisPipeline([['EVAL', script, '2', 'delta-control:processed:' + messageId, QUEUE_KEY, JSON.stringify(movement), '604800']]);
   return Number(results[0]) === 1;
 }
