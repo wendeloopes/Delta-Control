@@ -2,8 +2,8 @@ declare const process: { env: Record<string, string | undefined> };
 export type QueuedMovement = { id: string; type: 'entrada' | 'saida' | 'investimento'; amount: number; description: string; category: string; createdAt: string; installment?: string; paid: boolean; demo: false; source: 'whatsapp' };
 const QUEUE_KEY = 'delta-control:pending-movements';
 function redisConfig() {
-  const url = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/+$/, '');
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = (process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL)?.replace(/\/+$/, '');
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
   if (!url || !token) throw new Error('Redis não configurado.');
   return { url, token };
 }
@@ -15,13 +15,34 @@ async function redisPipeline(commands: string[][]): Promise<unknown[]> {
   if (payload.some(item => item.error)) throw new Error('Falha em operação Redis.');
   return payload.map(item => item.result);
 }
+function constantTimeEqual(left: string, right: string): boolean {
+  let mismatch = left.length ^ right.length;
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    mismatch |= (left.charCodeAt(index % Math.max(left.length, 1)) || 0) ^ (right.charCodeAt(index % Math.max(right.length, 1)) || 0);
+  }
+  return mismatch === 0;
+}
+/** Only the configured Bearer secret is accepted; legacy x-api-key headers are intentionally rejected. */
 export function isAuthorized(request: { headers: Record<string, string | string[] | undefined> }, expected?: string): boolean {
   if (!expected) return false;
-  const raw = request.headers['x-api-key'];
-  const key = Array.isArray(raw) ? raw[0] : raw;
-  const auth = request.headers.authorization;
-  const bearer = typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  return key === expected || bearer === expected;
+  const authorizationEntry = Object.entries(request.headers ?? {}).find(([name]) => name.toLowerCase() === 'authorization')?.[1];
+  const authorization = Array.isArray(authorizationEntry) ? authorizationEntry[0] : authorizationEntry;
+  if (typeof authorization !== 'string') return false;
+  const match = authorization.trim().match(/^Bearer\s+([^\s]+)$/i);
+  return !!match && constantTimeEqual(match[1], expected);
+}
+/** SHA-256 digest used as Redis membership key; raw device tokens are never stored server-side. */
+export async function hashDeviceToken(token: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+/** Unknown or revoked tokens fail closed. Redis errors propagate and are handled as 503. */
+export async function isAuthorizedDeviceToken(token: string): Promise<boolean> {
+  if (!token || token.length < 32 || token.length > 256) return false;
+  const digest = await hashDeviceToken(token);
+  const results = await redisPipeline([['SISMEMBER', 'delta:authorized_devices', digest]]);
+  return Number(results[0]) === 1;
 }
 export async function enqueueMovement(movement: QueuedMovement, messageId: string): Promise<boolean> {
   const script = "local inserted = redis.call('SET', KEYS[1], '1', 'EX', ARGV[2], 'NX')\nif not inserted then return 0 end\nredis.call('LPUSH', KEYS[2], ARGV[1])\nreturn 1";
