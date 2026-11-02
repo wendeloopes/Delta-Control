@@ -33,7 +33,7 @@ export function isAuthorized(request: { headers: Record<string, string | string[
   return !!match && constantTimeEqual(match[1], expected);
 }
 export async function enqueueMovement(movement: QueuedMovement, messageId: string): Promise<boolean> {
-  const script = "local inserted = redis.call('SET', KEYS[1], '1', 'EX', ARGV[2], 'NX')\\nif not inserted then return 0 end\\nredis.call('LPUSH', KEYS[2], ARGV[1])\\nreturn 1";
+  const script = "local inserted = redis.call('SET', KEYS[1], '1', 'EX', ARGV[2], 'NX')\nif not inserted then return 0 end\nredis.call('LPUSH', KEYS[2], ARGV[1])\nreturn 1";
   const results = await redisPipeline([['EVAL', script, '2', 'delta-control:processed:' + messageId, QUEUE_KEY, JSON.stringify(movement), '604800']]);
   return Number(results[0]) === 1;
 }
